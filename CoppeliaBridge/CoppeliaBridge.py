@@ -1,6 +1,26 @@
 #  python -m pip install coppeliasim-zmqremoteapi-client
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
+'''
+TODO:
+Path Definition:
+    Define paths from the python script rather than in Coppelia Sim?
+    https://manual.coppeliarobotics.com/en/paths.htm
+
+Path Error Determination:
+sim.getClosestPosOnPath - Returns nearest position along the path  https://manual.coppeliarobotics.com/en/regularApi/simGetClosestPosOnPath.htm
+    This will require choosing which path we should be going along. May also need to limit the points that we choose based on some metric such as distance traveled to prevent the vehicle from shortcutting the track
+
+Obstacle Positions:
+    Return distance vectors to obstacles "in view"
+    Return contact boolean
+
+Vehicle State:
+    Package vehicle state in an easy to use format   
+
+'''
+
+
 class CoppeliaBridge:
     def __init__(self):
         self._initialized = True
@@ -15,6 +35,7 @@ class CoppeliaBridge:
         self._egoVehicle = self._sim.getObject('/Motorbike/CoM')
         self._speedMotor = self._sim.getObject('/motor')
         self._steerMotor = self._sim.getObject('/steeringMotor')
+        self._path1 = self._sim.getObject('/Motorbike/path')
 
         #pos = self._sim.getObjectPosition(C)
 
@@ -77,6 +98,14 @@ class CoppeliaBridge:
         '''
         self._sim.setJointTargetPosition(self._steerMotor,steerTarget)
 
+    def getPathData(self):
+        #Assuming Path info is a list of position+quaterion (7 items per point) 
+        #https://manual.coppeliarobotics.com/en/regularApi/simGetPathLengths.htm
+        pathInfo = self._sim.unpackDoubleTable(self._sim.readCustomBufferData(self._path1,'PATH'))
+        #Need to return XYZ points, and path lengths for use in finding closest pos along the path
+        return pathInfo
+    
+
 
 
     def __del__(self):
@@ -97,10 +126,11 @@ bridge.startSimulation()
 print(bridge.getTimeStepSize())
 bridge.setSpeed(5.5)
 curTime = 0
-while bridge._isRunning and (curTime<45):
+while bridge._isRunning and (curTime<15):
     bridge.stepTime()
     curTime = bridge.getTime()
 
 print(curTime)
 print("Time Elapsed!")
 bridge.stopSimulation()
+print(len(bridge.getPathData()))
