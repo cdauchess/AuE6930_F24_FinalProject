@@ -7,16 +7,16 @@ class CoppeliaBridge:
         self._isRunning = False
         
         self._client = RemoteAPIClient()        
-        self._sim = client.require('sim')
+        self._sim = self._client.require('sim')
 
         self._sim.setStepping(True)
 
-        self._world = self._sim.getObject('../Floor')
-        self._egoVehicle = self._sim.getObject('../CoM')
-        self._speedMotor = self._sim.getObject('../motor')
-        self._steerMotor = self._sim.getObject('../steeringMotor')
+        self._world = self._sim.getObject('/Floor')
+        self._egoVehicle = self._sim.getObject('/Motorbike/CoM')
+        self._speedMotor = self._sim.getObject('/motor')
+        self._steerMotor = self._sim.getObject('/steeringMotor')
 
-        pos = sim.getObjectPosition(C)
+        #pos = self._sim.getObjectPosition(C)
 
     def startSimulation(self):
         '''
@@ -50,7 +50,7 @@ class CoppeliaBridge:
         '''
         Gets step size set in CoppeliaSim simulator
         '''
-        return self._sim.getTimeStepSize()
+        return self._sim.getSimulationTimeStep()
     
     def stepTime(self):
         '''
@@ -64,8 +64,18 @@ class CoppeliaBridge:
         Get current time in simulation
         '''
         return self._sim.getSimulationTime()
+    
+    def setSpeed(self,speedTarget):
+        '''
+        Set the motor speed
+        '''
+        self._sim.setJointTargetVelocity(self._speedMotor,speedTarget)
 
-
+    def setSteering(self,steerTarget):
+        '''
+        Set the steering
+        '''
+        self._sim.setJointTargetPosition(self._steerMotor,steerTarget)
 
 
 
@@ -79,3 +89,18 @@ class CoppeliaBridge:
 
             self._initialized = False
         pass
+
+
+
+bridge = CoppeliaBridge()
+bridge.startSimulation()
+print(bridge.getTimeStepSize())
+bridge.setSpeed(5.5)
+curTime = 0
+while bridge._isRunning and (curTime<45):
+    bridge.stepTime()
+    curTime = bridge.getTime()
+
+print(curTime)
+print("Time Elapsed!")
+bridge.stopSimulation()
