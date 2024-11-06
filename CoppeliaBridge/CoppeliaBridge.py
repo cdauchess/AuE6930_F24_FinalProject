@@ -1,15 +1,12 @@
 #  python -m pip install coppeliasim-zmqremoteapi-client
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
+import numpy as np
 
 '''
 TODO:
-Path Definition:
-    Define paths from the python script rather than in Coppelia Sim?
-    https://manual.coppeliarobotics.com/en/paths.htm
-
 Path Error Determination:
-sim.getClosestPosOnPath - Returns nearest position along the path  https://manual.coppeliarobotics.com/en/regularApi/simGetClosestPosOnPath.htm
-    This will require choosing which path we should be going along. May also need to limit the points that we choose based on some metric such as distance traveled to prevent the vehicle from shortcutting the track
+    Need to decide to work in world frame or each path's frame. Likely should work in world frame for simplicity.
+    
 
 Obstacle Positions:
     Return distance vectors to obstacles "in view"
@@ -17,12 +14,11 @@ Obstacle Positions:
 
 Vehicle State:
     Package vehicle state in an easy to use format   
-
 '''
 
 
 class CoppeliaBridge:
-    def __init__(self):
+    def __init__(self,numPaths):
         self._initialized = True
         self._isRunning = False
         
@@ -35,7 +31,21 @@ class CoppeliaBridge:
         self._egoVehicle = self._sim.getObject('/Motorbike/CoM')
         self._speedMotor = self._sim.getObject('/motor')
         self._steerMotor = self._sim.getObject('/steeringMotor')
-        self._path1 = self._sim.getObject('/Motorbike/path')
+        
+        #Path information loading from simulation environment
+        self._path = []
+        self._pathPositions = []
+        self._pathQuaternions = []
+        self._pathLengths = []
+        for idx in range(numPaths):
+            pathPath = '/path' + str(idx+1)
+            self._path.append(self._sim.getObject(pathPath))
+            tempPos, tempQuaternion, tempLen = self.getPathData(idx) #Load Path Data from Model
+            self._pathPositions.append(tempPos)
+            self._pathQuaternions.append(tempQuaternion)
+            self._pathLengths.append(tempLen)
+            
+        self.activePath = 0 #Current path being followed by the vehicle
 
         #pos = self._sim.getObjectPosition(C)
 
@@ -62,10 +72,10 @@ class CoppeliaBridge:
 
     
     def getEgoPose(self):
-        pos = self._sim.getObjectPosition(self._egoVehicle)
+        pos = self._sim.getObjectPosition(self._egoVehicle, self._path[self.activePath])
         rot = self._sim.getObjectOrientation(self._egoVehicle, self._world)
 
-        return [pos[1], pos[2], rot[2]]
+        return pos,rot
     
     def getTimeStepSize(self):
         '''
@@ -98,12 +108,34 @@ class CoppeliaBridge:
         '''
         self._sim.setJointTargetPosition(self._steerMotor,steerTarget)
 
-    def getPathData(self):
+    #Path Reference: https://manual.coppeliarobotics.com/en/paths.htm
+    def getPathData(self, pathNum):
+        '''
+        Get the information about the chosen path
+        '''
         #Assuming Path info is a list of position+quaterion (7 items per point) 
-        #https://manual.coppeliarobotics.com/en/regularApi/simGetPathLengths.htm
-        pathInfo = self._sim.unpackDoubleTable(self._sim.readCustomBufferData(self._path1,'PATH'))
-        #Need to return XYZ points, and path lengths for use in finding closest pos along the path
-        return pathInfo
+        self.rawPathInfo = self._sim.unpackDoubleTable(self._sim.readCustomBufferData(self._path[pathNum],'PATH'))
+        pathInfo = np.reshape(self.rawPathInfo,(-1,7))
+        pathPositions = pathInfo[:, :3].flatten().tolist() #XYZ Positions of each path point
+        pathQuaternions = pathInfo[:, 3:].flatten().tolist() #Path point orientations
+        pathLengths, self.totalLength = self._sim.getPathLengths(pathPositions, 3) #Length along path for each path point
+        
+        return pathPositions, pathQuaternions, pathLengths
+        
+    
+    def getPathError(self, pathNum):
+        
+        pathPos = self._pathPositions[pathNum]
+        pathQuaternion = self._pathQuaternions[pathNum]
+        pathLen = self._pathLengths[pathNum]
+        
+        currPos,currOrient = self.getEgoPose()
+        posAlongPath = self._sim.getClosestPosOnPath(pathPos, pathLen, currPos)
+        nearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, posAlongPath)
+        pathError = np.subtract(currPos,nearestPoint)
+
+        orientErr = None
+        return pathError,orientErr
     
 
 
@@ -121,16 +153,17 @@ class CoppeliaBridge:
 
 
 
-bridge = CoppeliaBridge()
+bridge = CoppeliaBridge(2)
 bridge.startSimulation()
 print(bridge.getTimeStepSize())
 bridge.setSpeed(5.5)
 curTime = 0
+pathError = []
 while bridge._isRunning and (curTime<15):
     bridge.stepTime()
     curTime = bridge.getTime()
+    pathErrorT,_ = bridge.getPathError(bridge.activePath)
+    pathError.append(pathErrorT)
 
-print(curTime)
 print("Time Elapsed!")
 bridge.stopSimulation()
-print(len(bridge.getPathData()))
