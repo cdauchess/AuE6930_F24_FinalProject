@@ -5,7 +5,7 @@ import numpy as np
 '''
 TODO:
 Path Error Determination:
-    Need to decide to work in world frame or each path's frame. Likely should work in world frame for simplicity.
+    Orientation Error
     
 
 Obstacle Positions:
@@ -26,11 +26,17 @@ class CoppeliaBridge:
         self._sim = self._client.require('sim')
 
         self._sim.setStepping(True)
-
+        
         self._world = self._sim.getObject('/Floor')
-        self._egoVehicle = self._sim.getObject('/Motorbike/CoM')
-        self._speedMotor = self._sim.getObject('/motor')
-        self._steerMotor = self._sim.getObject('/steeringMotor')
+        
+        #These are the handles for the motorbike in the simulation environment
+        #self._egoVehicle = self._sim.getObject('/Motorbike/CoM')
+        #self._speedMotor = self._sim.getObject('/Motorbike/rearSuspension/motor')
+        #self._steerMotor = self._sim.getObject('/Motorbike/steeringMotor')
+        #These are the handles for the "Manta Vehicle"
+        self._egoVehicle = self._sim.getObject('/Manta/body_dummy')
+        self._speedMotor = self._sim.getObject('/Manta/motor_joint')
+        self._steerMotor = self._sim.getObject('/Manta/steer_joint')
         
         #Path information loading from simulation environment
         self._path = []
@@ -46,6 +52,7 @@ class CoppeliaBridge:
             self._pathLengths.append(tempLen)
             
         self.activePath = 0 #Current path being followed by the vehicle
+        self.setMaxSteerAngle()
 
         #pos = self._sim.getObjectPosition(C)
 
@@ -70,12 +77,16 @@ class CoppeliaBridge:
         self._sim.stopSimulation()
         self._isRunning = False
 
-    
-    def getEgoPose(self):
-        pos = self._sim.getObjectPosition(self._egoVehicle, self._path[self.activePath])
-        rot = self._sim.getObjectOrientation(self._egoVehicle, self._world)
+    #frame - the object who's frame the pose is returned relative to
+    def getEgoPose(self, frame):
+        pos = self._sim.getObjectPosition(self._egoVehicle, frame)
+        rot = self._sim.getObjectOrientation(self._egoVehicle, frame)
 
         return pos,rot
+    
+    def getEgoPoseWorld(self):
+        
+        return self.getEgoPose(self._world)
     
     def getTimeStepSize(self):
         '''
@@ -100,13 +111,36 @@ class CoppeliaBridge:
         '''
         Set the motor speed
         '''
+        self._sim.setJointTargetForce(self._speedMotor, 60) #Setting motor torque
         self._sim.setJointTargetVelocity(self._speedMotor,speedTarget)
+        
+    def getSpeed(self):
+        '''
+        Get the current motor speed
+        '''
+        return self._sim.getJointVelocity(self._speedMotor)
 
     def setSteering(self,steerTarget):
         '''
-        Set the steering
+        Set the steering target
         '''
+        #Bound the steering angle
+        if steerTarget>self._maxSteerAngle:
+            steerTarget = self._maxSteerAngle
+        elif steerTarget<(-1*self._maxSteerAngle):
+            steerTarget = -1*self._maxSteerAngle
+
         self._sim.setJointTargetPosition(self._steerMotor,steerTarget)
+        
+    def getSteeringAngle(self):
+        '''
+        Get the current steering angle
+        '''
+        return self._sim.getJointPosition(self._steerMotor)
+        
+    #maxAngle - maximum steering angle in radians
+    def setMaxSteerAngle(self,maxAngle = 0.523599):
+        self._maxSteerAngle = maxAngle
 
     #Path Reference: https://manual.coppeliarobotics.com/en/paths.htm
     def getPathData(self, pathNum):
@@ -124,18 +158,37 @@ class CoppeliaBridge:
         
     
     def getPathError(self, pathNum):
-        
+        '''
+        Return the error relative to the closest point along the target path
+        '''
+        #Get the path info of the path in question
         pathPos = self._pathPositions[pathNum]
         pathQuaternion = self._pathQuaternions[pathNum]
         pathLen = self._pathLengths[pathNum]
         
-        currPos,currOrient = self.getEgoPose()
+        currPos,currOrient = self.getEgoPose(self._path[self.activePath]) #Find the vehicle's current pose
         posAlongPath = self._sim.getClosestPosOnPath(pathPos, pathLen, currPos)
-        nearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, posAlongPath)
+        nearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, posAlongPath)#Convert the position along path to an XYZ position in the path's frame
         pathError = np.subtract(currPos,nearestPoint)
 
         orientErr = None
         return pathError,orientErr
+    
+    def getVehicleState(self):
+        '''
+        Function to package the current vehicle state into a dictionary
+        '''
+        pos,orient = self.getEgoPoseWorld()
+        speed = self.getSpeed()
+        steer = self.getSteeringAngle()
+        
+        vehState = {
+            "Position": pos,
+            "Orientation": orient,
+            "Speed": speed,
+            "Steering": steer}
+        
+        return vehState
     
 
 
@@ -153,17 +206,3 @@ class CoppeliaBridge:
 
 
 
-bridge = CoppeliaBridge(2)
-bridge.startSimulation()
-print(bridge.getTimeStepSize())
-bridge.setSpeed(5.5)
-curTime = 0
-pathError = []
-while bridge._isRunning and (curTime<15):
-    bridge.stepTime()
-    curTime = bridge.getTime()
-    pathErrorT,_ = bridge.getPathError(bridge.activePath)
-    pathError.append(pathErrorT)
-
-print("Time Elapsed!")
-bridge.stopSimulation()
