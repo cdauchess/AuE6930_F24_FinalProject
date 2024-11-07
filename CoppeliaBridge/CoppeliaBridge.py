@@ -11,9 +11,6 @@ Path Error Determination:
 Obstacle Positions:
     Return distance vectors to obstacles "in view"
     Return contact boolean
-
-Vehicle State:
-    Package vehicle state in an easy to use format   
 '''
 
 
