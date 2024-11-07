@@ -1,11 +1,12 @@
 #  python -m pip install coppeliasim-zmqremoteapi-client
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
+import math
 
 '''
 TODO:
 Path Error Determination:
-    Orientation Error
+    Orientation Error. There is currently a coordinate system issue here.
     
 
 Obstacle Positions:
@@ -14,6 +15,7 @@ Obstacle Positions:
 '''
 
 
+# This class is a bridge between Coppelia Sim and Python
 class CoppeliaBridge:
     def __init__(self,numPaths):
         self._initialized = True
@@ -74,8 +76,10 @@ class CoppeliaBridge:
         self._sim.stopSimulation()
         self._isRunning = False
 
-    #frame - the object who's frame the pose is returned relative to
     def getEgoPose(self, frame):
+        '''
+        Returns the vehicle's pose in a given frame
+        '''
         pos = self._sim.getObjectPosition(self._egoVehicle, frame)
         rot = self._sim.getObjectOrientation(self._egoVehicle, frame)
 
@@ -135,8 +139,10 @@ class CoppeliaBridge:
         '''
         return self._sim.getJointPosition(self._steerMotor)
         
-    #maxAngle - maximum steering angle in radians
     def setMaxSteerAngle(self,maxAngle = 0.523599):
+        '''
+        Set the maximum steering angle allowed, in radians
+        '''
         self._maxSteerAngle = maxAngle
 
     #Path Reference: https://manual.coppeliarobotics.com/en/paths.htm
@@ -157,6 +163,7 @@ class CoppeliaBridge:
     def getPathError(self, pathNum):
         '''
         Return the error relative to the closest point along the target path
+        Returns orientation error as the rotation error about the z axis.
         '''
         #Get the path info of the path in question
         pathPos = self._pathPositions[pathNum]
@@ -168,7 +175,22 @@ class CoppeliaBridge:
         nearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, posAlongPath)#Convert the position along path to an XYZ position in the path's frame
         pathError = np.subtract(currPos,nearestPoint)
 
+        #Find Orientation Error relative to the chosen path
+        #Currently a coordinate system issue in orientation error. 
+        lookAhead = 0.1
+        nextPos = posAlongPath+lookAhead
+        #Compare to the final path position, wrap around if beyond that
+        if nextPos > pathPos[-1]:
+            nextPos = pathPos[0]
+        nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
+        
+        pathVector = np.subtract(nextNearestPoint,nearestPoint)
+        pathTrajectory = math.tan(pathVector[1]/pathVector[0])
+        orientErr = currOrient[2]-pathTrajectory
+        orientErr = currOrient[2]+math.pi
+        
         orientErr = None
+        
         return pathError,orientErr
     
     def getVehicleState(self):
@@ -187,9 +209,6 @@ class CoppeliaBridge:
         
         return vehState
     
-
-
-
     def __del__(self):
         '''
         Destructor
@@ -200,6 +219,3 @@ class CoppeliaBridge:
 
             self._initialized = False
         pass
-
-
-
