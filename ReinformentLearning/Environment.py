@@ -136,6 +136,7 @@ class RLEnvironment:
             'steering': vehicle_state['Steering'],
             'path_error': path_error,
             'orient_error': orient_error
+            # TODO: Add Object distance/ position / spread (Perception Information)
         }
 
     def _calculate_reward(self, state: Dict) -> float:
@@ -156,6 +157,7 @@ class RLEnvironment:
         max_steps_reached = self.current_step >= self.config.max_steps
         path_error = np.linalg.norm(state['path_error'])
         off_track = path_error > self.config.max_path_error
+        # TODO: Add collision detection
         
         return max_steps_reached or off_track
 
@@ -170,7 +172,7 @@ class RLEnvironment:
             success=self.current_step >= self.config.max_steps
         )
 
-    def _get_random_position(self) -> List[float]:
+    def _get_random_position(self) -> List[float]:   
         """Generate random initial position"""
         return [
             self._initial_position[0] + random.uniform(
@@ -179,7 +181,8 @@ class RLEnvironment:
                 -self.config.position_range, self.config.position_range),
             self._initial_position[2]  # Keep Z constant
         ]
-
+        # TODO: Set the random position to be within the path 
+        
     def _get_random_orientation(self) -> List[float]:
         """Generate random initial orientation"""
         return [

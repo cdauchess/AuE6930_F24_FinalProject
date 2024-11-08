@@ -24,7 +24,7 @@ def test_rl_environment():
         print("Resetting environment...")
         
         # Reset environment
-        state = env.reset(randomize=False)
+        state = env.reset(randomize=True)
         print("Reset complete.")
         print(f"Initial state: {state}")
         print(f"Simulation running: {bridge._isRunning}")
