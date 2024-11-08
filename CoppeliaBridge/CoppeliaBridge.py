@@ -2,6 +2,7 @@
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import math
+import random
 
 '''
 TODO:
@@ -37,6 +38,10 @@ class CoppeliaBridge:
         self._speedMotor = self._sim.getObject('/Manta/motor_joint')
         self._steerMotor = self._sim.getObject('/Manta/steer_joint')
         
+        # Store initial state
+        self._initial_position = self._sim.getObjectPosition(self._egoVehicle, self._world)
+        self._initial_orientation = self._sim.getObjectOrientation(self._egoVehicle, self._world)
+        
         #Path information loading from simulation environment
         self._path = []
         self._pathPositions = []
@@ -50,10 +55,129 @@ class CoppeliaBridge:
             self._pathQuaternions.append(tempQuaternion)
             self._pathLengths.append(tempLen)
             
-        self.activePath = 0 #Current path being followed by the vehicle
+        self.activePath = 0 # Current path being followed by the vehicle
         self.setMaxSteerAngle()
 
+        # Episode management
+        self.episode_count = 0
+        self.max_episode_steps = 15  # Maximum steps per episode
+        self.current_episode_steps = 0
+        
+        # Randomization ranges for initial state
+        self.position_range = 1.0  # meters
+        self.orientation_range = 0.5  # radians
+
         #pos = self._sim.getObjectPosition(C)
+
+    def resetSimulation(self, randomize=True):
+        """
+        Reset the simulation to initial state, optionally with randomization
+        Returns: Initial state dictionary
+        """
+        self.stopSimulation()
+        self._sim.setStepping(True)
+        self.startSimulation()
+        
+        if randomize:
+            # Randomize initial position
+            random_offset = [
+                random.uniform(-self.position_range, self.position_range),
+                random.uniform(-self.position_range, self.position_range),
+                0  # Keep Z position constant
+            ]
+            new_position = [
+                self._initial_position[0] + random_offset[0],
+                self._initial_position[1] + random_offset[1],
+                self._initial_position[2]
+            ]
+            
+            # Randomize initial orientation (only yaw)
+            random_yaw = random.uniform(-self.orientation_range, self.orientation_range)
+            new_orientation = [
+                self._initial_orientation[0],
+                self._initial_orientation[1],
+                self._initial_orientation[2] + random_yaw
+            ]
+        else:
+            new_position = self._initial_position
+            new_orientation = self._initial_orientation
+        
+        # Set position and orientation
+        self._sim.setObjectPosition(self._egoVehicle, self._world, new_position)
+        self._sim.setObjectOrientation(self._egoVehicle, self._world, new_orientation)
+        
+        # Reset motors
+        self.setSpeed(0)
+        self.setSteering(0)
+        
+        # Reset episode counters
+        self.current_episode_steps = 0
+        self.episode_count += 1
+        
+        # Return initial state
+        return self.getVehicleState()
+    
+    def startEpisode(self, randomize=True):
+        """
+        Start a new episode
+        Returns: Initial state dictionary
+        """
+        return self.resetSimulation(randomize)
+    
+    def isEpisodeFinished(self):
+        """
+        Check if current episode should end
+        Returns: Boolean indicating if episode is done
+        """
+        # Get current state
+        pos, _ = self.getEgoPoseWorld()
+        path_error, _ = self.getPathError(self.activePath)
+        
+        # Define termination conditions
+        max_steps_reached = self.current_episode_steps >= self.max_episode_steps
+        off_track = abs(path_error[0]) > 5.0 or abs(path_error[1]) > 5.0
+        
+        return max_steps_reached or off_track
+    
+    def stepEpisode(self, speed, steering):
+        """
+        Perform one episode step with given controls
+        Returns: (new_state, done)
+        """
+        # Apply controls
+        self.setSpeed(speed)
+        self.setSteering(steering)
+        
+        # Step simulation
+        self.stepTime()
+        self.current_episode_steps += 1
+        
+        # Check if episode is finished
+        done = self.isEpisodeFinished()
+        
+        # Get new state
+        new_state = self.getVehicleState()
+        
+        return new_state, done
+    
+    def setRandomizationRanges(self, position_range=None, orientation_range=None):
+        """
+        Set the ranges for initial state randomization
+        """
+        if position_range is not None:
+            self.position_range = position_range
+        if orientation_range is not None:
+            self.orientation_range = orientation_range
+            
+    def getEpisodeStats(self):
+        """
+        Get current episode statistics
+        """
+        return {
+            'episode_number': self.episode_count,
+            'current_step': self.current_episode_steps,
+            'max_steps': self.max_episode_steps
+        }
 
     def startSimulation(self):
         '''
