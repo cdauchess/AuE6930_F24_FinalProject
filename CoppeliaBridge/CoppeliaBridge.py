@@ -23,7 +23,6 @@ class CoppeliaBridge:
         
         self._client = RemoteAPIClient()        
         self._sim = self._client.require('sim')
-
         self._sim.setStepping(True)
         
         self._world = self._sim.getObject('/Floor')
@@ -32,6 +31,7 @@ class CoppeliaBridge:
         #self._egoVehicle = self._sim.getObject('/Motorbike/CoM')
         #self._speedMotor = self._sim.getObject('/Motorbike/rearSuspension/motor')
         #self._steerMotor = self._sim.getObject('/Motorbike/steeringMotor')
+
         #These are the handles for the "Manta Vehicle"
         self._egoVehicle = self._sim.getObject('/Manta/body_dummy')
         self._speedMotor = self._sim.getObject('/Manta/motor_joint')
@@ -50,10 +50,20 @@ class CoppeliaBridge:
             self._pathQuaternions.append(tempQuaternion)
             self._pathLengths.append(tempLen)
             
-        self.activePath = 0 #Current path being followed by the vehicle
+        self.activePath = 0 # Current path being followed by the vehicle
         self.setMaxSteerAngle()
 
         #pos = self._sim.getObjectPosition(C)
+    
+    def setVehiclePose(self, position, orientation):
+        """Set vehicle position and orientation in the world frame"""
+        self._sim.setObjectPosition(self._egoVehicle, self._world, position)
+        self._sim.setObjectOrientation(self._egoVehicle, self._world, orientation)
+
+    def resetVehicle(self):
+        """Reset vehicle controls"""
+        self.setSpeed(0)
+        self.setSteering(0)
 
     def startSimulation(self):
         '''
