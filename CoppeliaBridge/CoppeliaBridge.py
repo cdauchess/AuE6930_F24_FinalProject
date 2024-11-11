@@ -33,9 +33,10 @@ class CoppeliaBridge:
         #self._steerMotor = self._sim.getObject('/Motorbike/steeringMotor')
 
         #These are the handles for the "Manta Vehicle"
-        self._egoVehicle = self._sim.getObject('/Manta/body_dummy')
+        self._egoVehicle = self._sim.getObject('/Manta')
         self._speedMotor = self._sim.getObject('/Manta/motor_joint')
         self._steerMotor = self._sim.getObject('/Manta/steer_joint')
+        self._proxSens = self._sim.getObject('/Manta/Proximity_sensor')
         
         #Path information loading from simulation environment
         self._path = []
@@ -202,6 +203,30 @@ class CoppeliaBridge:
         orientErr = None
         
         return pathError,orientErr
+    
+    def vehicleCollection(self):
+        self.vehicleCol =self._sim.createCollection(0)
+        self._sim.addItemToCollection(self.vehicleCol,self._sim.handle_tree, self._egoVehicle,0)
+    
+    def getCollision(self,vehicle, object = None):
+        '''
+        Check if the specified vehicle has collided with the specified object. Leave object empty if it is to be checked against everything in the environment
+        Specific object handling is WIP
+        '''
+        if object == None: #If nothing specified, check against all objects
+            object = self._sim.handle_all
+        res, dist, point,obj, n = self._sim.handleProximitySensor(self._proxSens)
+        #TODO
+        #Collision detection isn't working as it should. Using prox sensor above for now.
+        #result, colideObj = self._sim.checkCollision(self._vehicleCollide,object)
+        
+        return res
+    
+    def checkEgoCollide(self):
+        '''
+        Check is the ego vehicle has collided with anything in the environment
+        '''
+        return self.getCollision(self._egoVehicle)
     
     def getVehicleState(self):
         '''
