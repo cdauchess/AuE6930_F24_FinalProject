@@ -33,7 +33,7 @@ class CoppeliaBridge:
         #self._steerMotor = self._sim.getObject('/Motorbike/steeringMotor')
 
         #These are the handles for the "Manta Vehicle"
-        self._egoVehicle = self._sim.getObject('/Manta/body_dummy')
+        self._egoVehicle = self._sim.getObject('/Manta')
         self._speedMotor = self._sim.getObject('/Manta/motor_joint')
         self._steerMotor = self._sim.getObject('/Manta/steer_joint')
         
@@ -98,6 +98,39 @@ class CoppeliaBridge:
     def getEgoPoseWorld(self):
         
         return self.getEgoPose(self._world)
+    
+    def setInitPosition(self,pathNum=0,startPos=0):
+        '''
+        Sets the vehicles position to a position along the selected path
+        pathNum: index for which path the vehicle will be place upon (0 indexed)
+        startPos: valid values 0-1 (float) with 0 being the beginning of the path and 1 being the end of the path. For a closed path 0 and 1 are nearly the same position
+        '''
+        
+        pathPos = self._pathPositions[pathNum]
+        pathQuaternion = self._pathQuaternions[pathNum]
+        pathLen = self._pathLengths[pathNum]
+        
+        #Map starting position to valid values
+        startPathPos = startPos*max(pathLen)
+        
+        startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos)#Convert the position along path to an XYZ position in the path's frame
+        startPoint[2] = startPoint[2] +.2 #Offset in Z to keep vehicle above ground plane.
+
+        
+        lookAhead = 0.1
+        nextPos = startPathPos+lookAhead
+        #Compare to the final path position, wrap around if beyond that
+        if nextPos > pathLen[-1]:
+            nextPos = nextPos-pathLen[-1]
+        nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
+        
+        pathVector = np.subtract(nextNearestPoint,startPoint)
+        pathTrajectory = math.atan(pathVector[1]/pathVector[0])
+        
+        #Set the vehicle to the starting point
+        self._sim.setObjectPosition(self._egoVehicle,startPoint[:3],self._path[pathNum])
+        self._sim.setObjectOrientation(self._egoVehicle,[0,0,pathTrajectory-math.pi/2],self._path[pathNum])
+        
     
     def getTimeStepSize(self):
         '''
@@ -190,16 +223,13 @@ class CoppeliaBridge:
         lookAhead = 0.1
         nextPos = posAlongPath+lookAhead
         #Compare to the final path position, wrap around if beyond that
-        if nextPos > pathPos[-1]:
-            nextPos = pathPos[0]
+        if nextPos > pathLen[-1]:
+            nextPos = nextPos-pathLen[-1]
         nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
         
         pathVector = np.subtract(nextNearestPoint,nearestPoint)
-        pathTrajectory = math.tan(pathVector[1]/pathVector[0])
-        orientErr = currOrient[2]-pathTrajectory
-        orientErr = currOrient[2]+math.pi
-        
-        orientErr = None
+        pathTrajectory = math.atan(pathVector[1]/pathVector[0])
+        orientErr = currOrient[2]-pathTrajectory+math.pi/2
         
         return pathError,orientErr
     
