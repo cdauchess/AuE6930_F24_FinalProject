@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 
 bridge = CoppeliaBridge(2)
 bridge.startSimulation()
-print(bridge.getTimeStepSize())
 bridge.setSpeed(10)
+bridge.vehicleCollection()
 
 curTime = 0
 pathError = []
 orientError = []
-while bridge._isRunning and (curTime<15):
+while bridge._isRunning and (curTime<5):
     bridge.stepTime()
     curTime = bridge.getTime()
     pathErrorT,orientErrorT = bridge.getPathError(bridge.activePath)
@@ -21,6 +21,9 @@ while bridge._isRunning and (curTime<15):
         bridge.setSteering(0.2)
     pathError.append(pathErrorT)
     orientError.append(orientErrorT)
+    collide = bridge.getCollision(bridge._egoVehicle)
+    if collide:
+        print('Vehicle has Collided')
 
 print("Time Elapsed!")
 print(bridge.getEgoPoseWorld())
