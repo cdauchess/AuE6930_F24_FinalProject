@@ -158,8 +158,9 @@ class RLEnvironment:
         path_error = np.linalg.norm(state['path_error'])
         off_track = path_error > self.config.max_path_error
         # TODO: Add collision detection
+        collided = self.bridge.checkEgoCollide()
         
-        return max_steps_reached or off_track
+        return max_steps_reached or off_track or collided
 
     def get_episode_stats(self) -> EpisodeStats:
         """Get statistics for current episode"""
