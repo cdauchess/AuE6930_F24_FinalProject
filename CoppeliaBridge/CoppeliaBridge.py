@@ -1,7 +1,7 @@
 #  python -m pip install coppeliasim-zmqremoteapi-client
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
-import math
+from math import pi, tan, atan2, radians
 
 '''
 TODO:
@@ -14,29 +14,55 @@ Obstacle Positions:
     Return contact boolean
 '''
 
-
 # This class is a bridge between Coppelia Sim and Python
 class CoppeliaBridge:
-    def __init__(self,numPaths):
+    def __init__(self):
         self._initialized = True
         self._isRunning = False
+        self._isEgoReady = False
         
         self._client = RemoteAPIClient()        
         self._sim = self._client.require('sim')
-
+        
         self._sim.setStepping(True)
+        self._timeStep = self.getTimeStepSize()
         
         self._world = self._sim.getObject('/Floor')
         
-        #These are the handles for the motorbike in the simulation environment
-        #self._egoVehicle = self._sim.getObject('/Motorbike/CoM')
-        #self._speedMotor = self._sim.getObject('/Motorbike/rearSuspension/motor')
-        #self._steerMotor = self._sim.getObject('/Motorbike/steeringMotor')
-        #These are the handles for the "Manta Vehicle"
-        self._egoVehicle = self._sim.getObject('/Manta/body_dummy')
-        self._speedMotor = self._sim.getObject('/Manta/motor_joint')
-        self._steerMotor = self._sim.getObject('/Manta/steer_joint')
+    def initEgo(self):
+        self._m = 2.57                  # mass [Kg]
+        self._r = 0.033                 # tire radius [m]        
         
+        self._V_MAX = 8 #3                 # max speed [m/s]
+        self._ACC_MAX = 5 #1.5             # max acceleration [m/s2]
+        self._D_MAX = radians(26)       # max steering angle
+
+        self._l = 0.258                 # wheel Base [m]
+        self._t = 0.157                 # track width
+        self._tf = 0.112               # front king pin width
+
+        self._a = 0.126                 # distance from CG to front axle
+        self._b = self._l - self._a     # distance from CG to rear axle
+        
+        #Vehicle State
+        self._v = 0                     # speed
+        self._d = 0                     # steering Angle
+        
+
+        self._ego = self._sim.getObject('/qcar/CoM')
+        self._lDriveWheel = self._sim.getObject('/qcar/base_wheelrl_joint')
+        self._rDriveWheel = self._sim.getObject('/qcar/base_wheelrr_joint')        
+        self._lSteerAxis = self._sim.getObject('/qcar/base_hubfl_joint')
+        self._rSteerAxis = self._sim.getObject('/qcar/base_hubfr_joint')    
+
+        
+
+        self._isEgoReady = True  
+
+        self.setSteering(self._d) 
+        self.setVehicleSpeed(self._v) 
+
+    def initScene(self, numPaths):
         #Path information loading from simulation environment
         self._path = []
         self._pathPositions = []
@@ -55,6 +81,7 @@ class CoppeliaBridge:
 
         #pos = self._sim.getObjectPosition(C)
 
+    # Section: Application behavior
     def startSimulation(self):
         '''
         Starts CoppeliaSim simulator
@@ -76,18 +103,11 @@ class CoppeliaBridge:
         self._sim.stopSimulation()
         self._isRunning = False
 
-    def getEgoPose(self, frame):
+    def getTime(self):
         '''
-        Returns the vehicle's pose in a given frame
+        Get current time in simulation
         '''
-        pos = self._sim.getObjectPosition(self._egoVehicle, frame)
-        rot = self._sim.getObjectOrientation(self._egoVehicle, frame)
-
-        return pos,rot
-    
-    def getEgoPoseWorld(self):
-        
-        return self.getEgoPose(self._world)
+        return self._sim.getSimulationTime()
     
     def getTimeStepSize(self):
         '''
@@ -102,49 +122,105 @@ class CoppeliaBridge:
         if self._isRunning:
             self._sim.step()
 
-    def getTime(self):
-        '''
-        Get current time in simulation
-        '''
-        return self._sim.getSimulationTime()
-    
-    def setSpeed(self,speedTarget):
-        '''
-        Set the motor speed
-        '''
-        self._sim.setJointTargetForce(self._speedMotor, 60) #Setting motor torque
-        self._sim.setJointTargetVelocity(self._speedMotor,speedTarget)
-        
-    def getSpeed(self):
-        '''
-        Get the current motor speed
-        '''
-        return self._sim.getJointVelocity(self._speedMotor)
 
-    def setSteering(self,steerTarget):
-        '''
-        Set the steering target
-        '''
-        #Bound the steering angle
-        if steerTarget>self._maxSteerAngle:
-            steerTarget = self._maxSteerAngle
-        elif steerTarget<(-1*self._maxSteerAngle):
-            steerTarget = -1*self._maxSteerAngle
-
-        self._sim.setJointTargetPosition(self._steerMotor,steerTarget)
-        
+    # Section: Vehicle behavior     
     def getSteeringAngle(self):
         '''
         Get the current steering angle
         '''
-        return self._sim.getJointPosition(self._steerMotor)
+        dl = self._sim.getJointPosition(self._lSteerAxis)
+        sign = pow(-1, dl<0)        
         
-    def setMaxSteerAngle(self,maxAngle = 0.523599):
-        '''
-        Set the maximum steering angle allowed, in radians
-        '''
-        self._maxSteerAngle = maxAngle
+        R = (self._l / tan(abs(dl))) + self._tf/2
 
+        return sign * atan2(self._l, R)
+
+    def setSteering(self, d):
+        '''
+        Set the steering target
+        '''
+        self._d = helper.bound(d, -self._D_MAX, self._D_MAX)
+        dl = 0
+        dr = 0
+
+        if self._d != 0:
+            d_abs = abs(self._d)
+            sign = pow(-1, self._d < 0)
+
+            R = (self._l / tan(d_abs))
+
+            dl = sign * atan2(self._l, (R - self._tf/2))
+            dr = sign * atan2(self._l, (R + self._tf/2))
+        
+        self._sim.setJointTargetPosition(self._lSteerAxis, dl)
+        self._sim.setJointTargetPosition(self._rSteerAxis, dr)
+
+        self._adjustDifferential()
+
+        # self._sim.setJointTargetPosition(self._steerMotor,steerTarget)    
+    
+    def getEgoPoseRelative(self, frame):
+        '''
+        Returns the vehicle's pose wrt a given frame
+        '''
+        pos = self._sim.getObjectPosition(self._ego, frame)
+        rot = self._sim.getObjectOrientation(self._ego, frame)
+
+        return pos, rot
+    
+    def getEgoPoseAbsolute(self):        
+        return self.getEgoPoseRelative(self._world)
+    
+    def setVehicleSpeed(self, v):
+        '''
+        Set the vehicle speed in m/s
+        '''
+        # self._sim.setJointTargetForce(self._speedMotor, 60) #Setting motor torque
+        self._v = helper.bound(v, 0, self._V_MAX)
+        self._adjustDifferential()
+        
+    def getVehicleSpeed(self):
+        '''
+        Get the current motor speed
+        '''
+        print(self._sim.getJointVelocity(self._lDriveWheel))
+        print(self._sim.getJointVelocity(self._rDriveWheel))
+        print(" ")
+        # return self._sim.getJointVelocity(self._speedMotor)
+
+    def setMotion(self, throttle):
+        self.setVehicleSpeed(self._v + (throttle * self._ACC_MAX * self._timeStep))
+        print(self._v)
+
+        # f = m * a * self._accLimit
+        # t * f * r/2
+        
+
+    def _adjustDifferential(self):
+        '''
+        Mimics a differential and sets Left / Right wheel to match steering
+        '''
+        vl = self._v
+        vr = self._v
+
+        # if self._d != 0:
+        #     d_abs = abs(self._d)        
+        #     sign = pow(-1, self._d < 0) # -ve indicates right turn
+            
+        #     R = (self._l / tan(d_abs))
+
+        #     vl = self._v * (R - (sign * self._t/2)) / R
+        #     vr = self._v * (R + (sign * self._t/2)) / R
+
+        self._sim.setJointTargetVelocity(self._lDriveWheel, -vl/self._r)
+        self._sim.setJointTargetVelocity(self._rDriveWheel,  vr/self._r)
+
+        # print(" ----- ")
+        # print(vl/self._r)
+        # print(vr/self._r)
+        # print(self._sim.getJointVelocity(self._lDriveWheel))
+        # print(self._sim.getJointVelocity(self._rDriveWheel))
+    
     #Path Reference: https://manual.coppeliarobotics.com/en/paths.htm
     def getPathData(self, pathNum):
         '''
@@ -185,9 +261,9 @@ class CoppeliaBridge:
         nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
         
         pathVector = np.subtract(nextNearestPoint,nearestPoint)
-        pathTrajectory = math.tan(pathVector[1]/pathVector[0])
-        orientErr = currOrient[2]-pathTrajectory
-        orientErr = currOrient[2]+math.pi
+        pathTrajectory = tan(pathVector[1]/pathVector[0])
+        orientErr = currOrient[2] - pathTrajectory
+        orientErr = currOrient[2] + pi
         
         orientErr = None
         
@@ -197,17 +273,16 @@ class CoppeliaBridge:
         '''
         Function to package the current vehicle state into a dictionary
         '''
-        pos,orient = self.getEgoPoseWorld()
-        speed = self.getSpeed()
-        steer = self.getSteeringAngle()
+        pos, rot = self.getEgoPoseAbsolute()
+        v = self.getSpeed()
+        d = self.getSteeringAngle()
         
-        vehState = {
-            "Position": pos,
-            "Orientation": orient,
-            "Speed": speed,
-            "Steering": steer}
+        X = {"Position": pos[0:1],
+             "Orientation": rot[2],
+             "Speed": v,
+             "Steering": d }
         
-        return vehState
+        return X
     
     def __del__(self):
         '''
@@ -219,3 +294,8 @@ class CoppeliaBridge:
 
             self._initialized = False
         pass
+
+
+class helper:
+    def bound(a, aMin, aMax):
+        return max(min(a, aMax), aMin)
