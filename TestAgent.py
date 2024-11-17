@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-def train_agent(num_episodes: int = 1000):
+def train_agent(num_episodes: int = 100):
     # Create environment
     bridge = CoppeliaBridge(2)
     config = EpisodeConfig(
