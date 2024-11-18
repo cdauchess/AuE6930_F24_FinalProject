@@ -67,6 +67,7 @@ class CoppeliaBridge:
         self._leftSensor = self._sim.getObject('/qcar/left_lidar')
         self._frontSensor = self._sim.getObject('/qcar/front_lidar')
         self._rightSensor = self._sim.getObject('/qcar/right_lidar')
+        self._rearSensor = self._sim.getObject('/qcar/rear_lidar')
 
         self._isEgoReady = True  
 
@@ -168,38 +169,41 @@ class CoppeliaBridge:
         self._adjustDifferential()
     
     def getOccupancyGrid(self):
-
-        minDist = 0.1
-        maxDist = 0.6
-        diffDist = maxDist - minDist
-
-        ang = np.deg2rad(np.arange(-45, 45, 0.25))
+        ang = np.deg2rad(np.arange(-45, 45, 0.125))
         angr = np.deg2rad(np.arange(45, -45, -0.25))
-        span = np.multiply(maxDist, np.tan(np.deg2rad(np.arange(-45, 45, 0.25))))
+        # span = np.multiply(maxDist, np.tan(np.deg2rad(np.arange(-45, 45, 0.25))))
 
         rawDataL, resL = self._sim.getVisionSensorDepth(self._leftSensor, 1)
         rawDataF, resF = self._sim.getVisionSensorDepth(self._frontSensor, 1)
         rawDataR, resR = self._sim.getVisionSensorDepth(self._rightSensor, 1)
+        rawDataB, resB = self._sim.getVisionSensorDepth(self._rearSensor, 1)
         
         # 2 rows of data        
         # xL = -np.average(np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1]), axis=0)
         xL = -np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1])[1]
-        yL = xL*np.sin(angr) #span        
+        yL = -xL*np.tan(ang) #span        
 
         # yF = np.average(np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1]), axis=0)
         yF = np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1])[1]
-        xF = yF*np.sin(ang) #span
+        xF = yF*np.tan(ang) #span
 
-        xR = np.average(np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1]), axis=0)
-        yR = -xR*np.sin(ang) #-span 
+        # xR = np.average(np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1]), axis=0)
+        xR = np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1])[1]
+        yR = -xR*np.tan(ang) #-span 
+       
+        # yB = -np.reshape(self._sim.unpackFloatTable(rawDataB), [resB[1], -1])[1]
+        # xB = yB*np.tan(angr) #-span 
                 
+        # x = np.append(np.append(np.append(xL, xF), xR), xB)
+        # y = np.append(np.append(np.append(yL, yF), yR), yB)
         x = np.append(np.append(xL, xF), xR)
         y = np.append(np.append(yL, yF), yR)
 
+        plt.clf()
         plt.plot(x, y, 'r')
         plt.axis('equal')
         plt.draw()
-        plt.pause(.001)
+        plt.pause(.001)        
 
     def getPose(self, object, frame):
         '''
