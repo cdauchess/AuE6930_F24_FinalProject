@@ -1,6 +1,6 @@
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
 import matplotlib.pyplot as plt
-from math import sin, pi, degrees
+from math import sin, pi, degrees, atan2, radians
 
 bridge = CoppeliaBridge()
 
@@ -10,23 +10,40 @@ bridge.initScene()
 bridge.startSimulation()
 # print(bridge.getPathError())
 
-bridge.setVehicleSpeed(0.6)
-# bridge.setSteering(0.45)
+# bridge.setVehicleSpeed(1)
+# bridge.setSteering(radians(20))
 
 curTime = 0
-runTime = 30
+runTime = 5
+
+# bridge.switchLane(1)
+
+switch = False
 
 while bridge._isRunning and (curTime < runTime):    
     bridge.stepTime()
     curTime = bridge.getTime()
-    # bridge.setMotion(1)
-    # bridge.getEgoPoseAbsolute()
-
-    # bridge.getVehicleSpeed()
-    # bridge.setSteering(0.2 * sin(4*pi*curTime/runTime))
+    bridge.getOccupancyGrid()
+    # # bridge.setMotion(1)
+    # # bridge.getEgoPoseAbsolute()
+    
+    # # if curTime > 0.5*runTime and not switch:
+    # #     bridge.switchLane(2)
+    # #     print("Switched")
+    # #     switch = True
+    # # bridge.getVehicleSpeed()
+    # # bridge.setSteering(0.2 * sin(4*pi*curTime/runTime))
     p,o = bridge.getPathError()
-    # print(o)
-    bridge.setSteering(-0.4*o)
+    v = bridge.getVehicleSpeed()
+    # print(p)
+    # # print(-atan2(*p, v))
+
+    # p == 0
+    # abs(p) < w
+
+
+    bridge.setSteering((-o - atan2(p, v))* 0.5)
+    # bridge.setSteering(-atan2(0.2*p, v))
 
 bridge.setVehicleSpeed(0)
 bridge.stopSimulation()

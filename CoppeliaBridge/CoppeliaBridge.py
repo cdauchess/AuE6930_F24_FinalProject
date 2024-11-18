@@ -3,7 +3,7 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import matplotlib.pyplot as plt
 from math import pi, tan, atan2, radians, remainder
-
+plt.ion()
 '''
 TODO:
 Path Error Determination:
@@ -31,26 +31,32 @@ class CoppeliaBridge:
         self._world = self._sim.getObject('/Floor')
         
     def initEgo(self):
-        self._m = 2.57                  # mass [Kg]
-        self._r = 0.033                 # tire radius [m]        
-        
+        # Motion Constraints
         self._V_MAX = 3                 # max speed [m/s]
         self._ACC_MAX = 5               # max acceleration [m/s2]
         self._D_MAX = radians(26)       # max steering angle
+        
+        # Sensor Constants
+        self._SENSOR_FOV = 90            # deg
+        self._SENSOR_RES = 0.5           # deg
 
+        # Vehivle Dimensions
+        self._m = 2.57                  # mass [Kg]
+        self._r = 0.033                 # tire radius [m]        
+        
         self._l = 0.258                 # wheel Base [m]
         self._t = 0.157                 # track width
-        self._tf = 0.112                # front king pin width
+        self._tf = 0.112                # front kingpin width
 
         self._a = 0.126                 # distance from CG to front axle
         self._b = self._l - self._a     # distance from CG to rear axle
         
-        #Vehicle State
+        # Vehicle State
         self._v = 0                     # speed
         self._d = 0                     # steering Angle
         
-
         self._ego = self._sim.getObject('/qcar/CoM')
+        self._front = self._sim.getObject('/qcar/Front')
 
         self._lDriveWheel = self._sim.getObject('/qcar/base_wheelrl_joint')
         self._rDriveWheel = self._sim.getObject('/qcar/base_wheelrr_joint')        
@@ -58,26 +64,14 @@ class CoppeliaBridge:
         self._lSteerAxis = self._sim.getObject('/qcar/base_hubfl_joint')
         self._rSteerAxis = self._sim.getObject('/qcar/base_hubfr_joint')    
 
+        self._leftSensor = self._sim.getObject('/qcar/left_lidar')
+        self._frontSensor = self._sim.getObject('/qcar/front_lidar')
+        self._rightSensor = self._sim.getObject('/qcar/right_lidar')
+
         self._isEgoReady = True  
 
         self.setSteering(self._d) 
         self.setVehicleSpeed(self._v) 
-
-    # def initScene(self, numPaths):
-    #     #Path information loading from simulation environment
-    #     self._path = []
-    #     self._pathPositions = []
-    #     self._pathQuaternions = []
-    #     self._pathLengths = []
-    #     for idx in range(numPaths):
-    #         pathPath = '/path' + str(idx+1)
-    #         self._path.append(self._sim.getObject(pathPath))
-    #         tempPos, tempQuaternion, tempLen = self.getPathData(idx) #Load Path Data from Model
-    #         self._pathPositions.append(tempPos)
-    #         self._pathQuaternions.append(tempQuaternion)
-    #         self._pathLengths.append(tempLen)
-            
-    #     self.activePath = 0 #Current path being followed by the vehicle        
 
     def initScene(self):
         self._lanes = []
@@ -155,14 +149,15 @@ class CoppeliaBridge:
         Set the steering target
         '''
         self._d = helper.bound(d, -self._D_MAX, self._D_MAX)
+
         dl = 0
         dr = 0
 
         if self._d != 0:
-            d_abs = abs(self._d)
-            sign = pow(-1, self._d < 0)
-
-            R = (self._l / tan(d_abs))
+            d_abs = abs(self._d)            
+            sign = pow(-1, self._d < 0)        
+            
+            R = (self._l / tan(d_abs))           
 
             dl = sign * atan2(self._l, (R - self._tf/2))
             dr = sign * atan2(self._l, (R + self._tf/2))
@@ -172,16 +167,59 @@ class CoppeliaBridge:
 
         self._adjustDifferential()
     
-    def getEgoPoseRelative(self, frame):
+    def getOccupancyGrid(self):
+
+        minDist = 0.1
+        maxDist = 0.6
+        diffDist = maxDist - minDist
+
+        ang = np.deg2rad(np.arange(-45, 45, 0.25))
+        angr = np.deg2rad(np.arange(45, -45, -0.25))
+        span = np.multiply(maxDist, np.tan(np.deg2rad(np.arange(-45, 45, 0.25))))
+
+        rawDataL, resL = self._sim.getVisionSensorDepth(self._leftSensor, 1)
+        rawDataF, resF = self._sim.getVisionSensorDepth(self._frontSensor, 1)
+        rawDataR, resR = self._sim.getVisionSensorDepth(self._rightSensor, 1)
+        
+        # 2 rows of data        
+        # xL = -np.average(np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1]), axis=0)
+        xL = -np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1])[1]
+        yL = xL*np.sin(angr) #span        
+
+        # yF = np.average(np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1]), axis=0)
+        yF = np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1])[1]
+        xF = yF*np.sin(ang) #span
+
+        xR = np.average(np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1]), axis=0)
+        yR = -xR*np.sin(ang) #-span 
+                
+        x = np.append(np.append(xL, xF), xR)
+        y = np.append(np.append(yL, yF), yR)
+
+        plt.plot(x, y, 'r')
+        plt.axis('equal')
+        plt.draw()
+        plt.pause(.001)
+
+    def getPose(self, object, frame):
         '''
         Returns the vehicle's pose wrt a given frame
         '''
-        pos = self._sim.getObjectPosition(self._ego, frame)
-        rot = self._sim.getObjectOrientation(self._ego, frame)
+        pos = self._sim.getObjectPosition(object, frame)
+        rot = self._sim.getObjectOrientation(object, frame)
 
         return pos, rot
     
+    def getEgoPoseRelative(self, frame):
+        '''
+        Returns the vehicle's pose wrt a given frame
+        '''       
+        return self.getPose(self._ego, frame)
+    
     def getEgoPoseAbsolute(self):        
+        '''
+        Returns the vehicle's absolute pose
+        '''
         return self.getEgoPoseRelative(self._world)
     
     def getVehicleSpeed(self):
@@ -245,12 +283,12 @@ class CoppeliaBridge:
         pathPos = self._pathPoints     
         pathLen = self._pathLengths
         
-        pos, rot = self.getEgoPoseAbsolute() #Find the vehicle's current pose
+        pos, rot = self.getPose(self._front, self._world) #Find the pose of the center of the front axle
 
         posAlongPath = self._sim.getClosestPosOnPath(pathPos, pathLen, pos)
         nearPt = self._sim.getPathInterpolatedConfig(pathPos, pathLen, posAlongPath) #Convert the position along path to an XYZ position in the path's frame
         
-        pathError = np.subtract(pos, nearPt)
+        pathError = np.subtract(nearPt, pos)
 
         lookAhead = 0.1
         nextPos = posAlongPath + lookAhead
@@ -262,11 +300,14 @@ class CoppeliaBridge:
         nextNearPt = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
         
         pathVector = np.subtract(nextNearPt, nearPt)
-        pathTrajectory = atan2(pathVector[1], pathVector[0])
+        pathTrajectory = atan2(pathVector[1], pathVector[0])        
+        # print(pathTrajectory)
+        # print(rot[2])
         orientErr =  helper.pipi(pathTrajectory - rot[2] + pi)
-                
+
+        pErr = np.sqrt(np.sum(np.power(pathError[0:2], 2))) * (pathError[1]/abs(pathError[1]))        
         # print(orientErr)
-        return pathError, orientErr
+        return pErr, orientErr
     
     def getVehicleState(self):
         '''
