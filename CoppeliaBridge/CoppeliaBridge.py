@@ -1,7 +1,11 @@
 #  python -m pip install coppeliasim-zmqremoteapi-client
+#  python -m pip install scikit-learn
+#  python -m pip install -U scikit-image
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import matplotlib.pyplot as plt
+
+from skimage.draw import polygon
 from math import pi, tan, atan2, radians, remainder
 plt.ion()
 '''
@@ -29,6 +33,17 @@ class CoppeliaBridge:
         self._timeStep = self.getTimeStepSize()
         
         self._world = self._sim.getObject('/Floor')
+
+        self._fig = plt.figure()
+        self._plotter = self._fig.add_subplot(121)
+        self._img     = self._fig.add_subplot(122)
+        # self._img.invert_yaxis()
+
+        self._plotter.set_xlim(-1.5, 1.5)
+        self._plotter.set_ylim(-1.5, 1.5)     
+
+        # self._img.set_xlim(0, 360)
+        # self._img.set_ylim(0, 360)        
         
     def initEgo(self):
         # Motion Constraints
@@ -168,42 +183,51 @@ class CoppeliaBridge:
 
         self._adjustDifferential()
     
-    def getOccupancyGrid(self):
-        ang = np.deg2rad(np.arange(-45, 45, 0.125))
-        angr = np.deg2rad(np.arange(45, -45, -0.25))
-        # span = np.multiply(maxDist, np.tan(np.deg2rad(np.arange(-45, 45, 0.25))))
+    def getOccupancyGrid(self):        
+        maxDist = 1.5
+        plot = False
 
         rawDataL, resL = self._sim.getVisionSensorDepth(self._leftSensor, 1)
         rawDataF, resF = self._sim.getVisionSensorDepth(self._frontSensor, 1)
         rawDataR, resR = self._sim.getVisionSensorDepth(self._rightSensor, 1)
         rawDataB, resB = self._sim.getVisionSensorDepth(self._rearSensor, 1)
         
-        # 2 rows of data        
-        # xL = -np.average(np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1]), axis=0)
-        xL = -np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1])[1]
-        yL = -xL*np.tan(ang) #span        
+        divs = np.arange(-maxDist, maxDist, 2*maxDist/resL[0]) / maxDist
 
-        # yF = np.average(np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1]), axis=0)
+        # 2 rows of data                
+        xL = -np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1])[1]                
+        yL = -xL * divs
+        
         yF = np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1])[1]
-        xF = yF*np.tan(ang) #span
+        xF =  yF * divs
 
-        # xR = np.average(np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1]), axis=0)
         xR = np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1])[1]
-        yR = -xR*np.tan(ang) #-span 
+        yR = -xR * divs
        
-        # yB = -np.reshape(self._sim.unpackFloatTable(rawDataB), [resB[1], -1])[1]
-        # xB = yB*np.tan(angr) #-span 
+        yB = -np.reshape(self._sim.unpackFloatTable(rawDataB), [resB[1], -1])[1]
+        xB =  yB * divs
                 
-        # x = np.append(np.append(np.append(xL, xF), xR), xB)
-        # y = np.append(np.append(np.append(yL, yF), yR), yB)
-        x = np.append(np.append(xL, xF), xR)
-        y = np.append(np.append(yL, yF), yR)
+        x = np.append(np.append(np.append(xL, xF), xR), xB)
+        y = np.append(np.append(np.append(yL, yF), yR), yB)
 
-        plt.clf()
-        plt.plot(x, y, 'r')
-        plt.axis('equal')
-        plt.draw()
-        plt.pause(.001)        
+        xImg = np.array((x + maxDist) * resL[0] / (2 * maxDist), dtype=int)
+        yImg = np.array(resL[0]- ((y + maxDist) * resL[0] / (2 * maxDist)), dtype=int)
+
+        og = np.zeros((resL[0], resL[0]), 'uint8')
+        rr, cc = polygon(xImg, yImg, og.shape)
+        og[cc, rr] = 1
+
+        if(plot):
+            self._plotter.clear()                            
+            self._plotter.plot(x, y, 'k')            
+            self._plotter.axis('square')
+
+            self._img.imshow(og, origin='upper')                
+            
+            plt.draw()
+            plt.pause(.001)   
+
+        return og
 
     def getPose(self, object, frame):
         '''
