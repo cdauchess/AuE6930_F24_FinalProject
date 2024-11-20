@@ -257,7 +257,7 @@ class CoppeliaBridge:
         vl = -self._sim.getJointVelocity(self._lDriveWheel)
         vr =  self._sim.getJointVelocity(self._rDriveWheel)
         
-        return((vl + vr)/2)        
+        return(self._r*(vl + vr)/2)        
     
     def setVehicleSpeed(self, v):
         '''
