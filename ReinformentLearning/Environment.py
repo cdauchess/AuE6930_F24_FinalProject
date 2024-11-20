@@ -1,4 +1,5 @@
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
+from .Reward import RLReward
 
 import random
 from dataclasses import dataclass
@@ -42,6 +43,10 @@ class RLEnvironment:
             self.bridge._egoVehicle, self.bridge._world)
         self._initial_orientation = self.bridge._sim.getObjectOrientation(
             self.bridge._egoVehicle, self.bridge._world)
+        
+        #Reward Function Configuration
+        #TODO - pass maximum speed and lane width
+        self.rewardFunctions = RLReward()
 
     def reset(self, randomize: bool = True) -> Dict:
         """
@@ -141,6 +146,7 @@ class RLEnvironment:
 
     def _calculate_reward(self, state: Dict) -> float:
         """Calculate reward for current state"""
+        '''
         path_error = state['path_error']
         steering = state['steering']
         
@@ -148,8 +154,9 @@ class RLEnvironment:
         distance_error = np.linalg.norm(path_error)
         path_reward = -distance_error
         steering_penalty = -0.1 * abs(steering/self.bridge._maxSteerAngle)
+        '''
         
-        return path_reward + steering_penalty
+        return self.rewardFunctions.calcReward(state)
 
     def _is_done(self, state: Dict) -> bool:
         """Check if episode should terminate"""
