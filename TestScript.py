@@ -6,8 +6,10 @@ import time
 import numpy as np
 
 def runSim(bridge: CoppeliaBridge, duration, startPoint):
+    bridge.initScene()
+    bridge.initEgo()
     bridge.startSimulation()
-    bridge.setSpeed(5)
+    bridge.setVehicleSpeed(5)
     bridge.setInitPosition(0,startPoint)
 
     curTime = 0
@@ -17,10 +19,11 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint):
     while bridge._isRunning and (curTime<duration):
         bridge.stepTime()
         curTime = bridge.getTime()
-        pathErrorT,orientErrorT = bridge.getPathError(bridge.activePath)
+        print(curTime)
+        pathErrorT,orientErrorT = bridge.getPathError()
         
         #Simple Steering Controller for testing bridge functionality
-        if pathErrorT[1] < 0:
+        if pathErrorT < 0:
             bridge.setSteering(0.2)
         else:
             bridge.setSteering(-0.2)
@@ -33,10 +36,10 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint):
     while bridge._isRunning and (curTime<duration):
         bridge.stepTime()
         curTime = bridge.getTime()
-        pathErrorT,orientErrorT = bridge.getPathError(bridge.activePath)
+        pathErrorT,orientErrorT = bridge.getPathError()
         
         #Simple Steering Controller for testing bridge functionality
-        if pathErrorT[1] < 0:
+        if pathErrorT < 0:
             bridge.setSteering(0.2)
         else:
             bridge.setSteering(-0.2)
@@ -53,6 +56,7 @@ def runSimRenderTest(bridge:CoppeliaBridge, numRuns, duration):
     noRenderTimes = []
     
     startPos = np.linspace(0,1,numRuns)
+    startPos = [0.5]
     print(startPos)
     
     for run in range(numRuns): #Run the sims
@@ -62,7 +66,7 @@ def runSimRenderTest(bridge:CoppeliaBridge, numRuns, duration):
         renderTimes.append(end-start)
         print('Render Time: %0.2f' %(end-start))
         
-        time.sleep(0.1)
+        time.sleep(0.5)
 
         bridge._sim.setBoolParam(bridge._sim.boolparam_display_enabled, False)
         start = time.time()
@@ -78,7 +82,7 @@ def runSimRenderTest(bridge:CoppeliaBridge, numRuns, duration):
 
 
 bridge = CoppeliaBridge()
-render, noRender = runSimRenderTest(bridge, 10, 30)
+render, noRender = runSimRenderTest(bridge, 1, 5)
 
 print('30 second simulation, mean render time: %0.2f S, mean no render time: %0.2f S' %(np.mean(render), np.mean(noRender)))
 

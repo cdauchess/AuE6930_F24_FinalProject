@@ -6,8 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from skimage.draw import polygon
-from math import pi, tan, atan2, radians, remainder
-plt.ion()
+from math import pi, tan, atan2, radians, remainder, atan
+#plt.ion()
 '''
 TODO:
 Path Error Determination:
@@ -135,6 +135,20 @@ class CoppeliaBridge:
         Get current time in simulation
         '''
         return self._sim.getSimulationTime()
+        
+    #Path Reference: https://manual.coppeliarobotics.com/en/paths.htm
+    def getPathData(self, pathNum):
+        '''
+        Get the information about the chosen path
+        '''
+        #Assuming Path info is a list of position+quaterion (7 items per point) 
+        self.rawPathInfo = self._sim.unpackDoubleTable(self._sim.readCustomBufferData(self._lanes[pathNum],'PATH'))
+        pathInfo = np.reshape(self.rawPathInfo,(-1,7))
+        pathPositions = pathInfo[:, :3].flatten().tolist() #XYZ Positions of each path point
+        pathQuaternions = pathInfo[:, 3:].flatten().tolist() #Path point orientations
+        pathLengths, self.totalLength = self._sim.getPathLengths(pathPositions, 3) #Length along path for each path point
+        
+        return pathPositions, pathQuaternions, pathLengths    
     
     def setInitPosition(self,pathNum=0,startPos=0):
         '''
@@ -143,9 +157,11 @@ class CoppeliaBridge:
         startPos: valid values 0-1 (float) with 0 being the beginning of the path and 1 being the end of the path. For a closed path 0 and 1 are nearly the same position
         '''
         
-        pathPos = self._pathPositions[pathNum]
-        pathQuaternion = self._pathQuaternions[pathNum]
-        pathLen = self._pathLengths[pathNum]
+        #pathPos = self._pathPositions[pathNum]
+        #pathQuaternion = self._pathQuaternions[pathNum]
+        #athLen = self._pathLengths[pathNum]
+        
+        pathPos,pathQuaternion,pathLen = self.getPathData(pathNum)
         
         #Map starting position to valid values
         startPathPos = startPos*max(pathLen)
@@ -162,44 +178,11 @@ class CoppeliaBridge:
         nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
         
         pathVector = np.subtract(nextNearestPoint,startPoint)
-        pathTrajectory = math.atan(pathVector[1]/pathVector[0])
+        pathTrajectory = atan(pathVector[1]/pathVector[0])
         
         #Set the vehicle to the starting point
-        self._sim.setObjectPosition(self._egoVehicle,startPoint[:3],self._path[pathNum])
-        self._sim.setObjectOrientation(self._egoVehicle,[0,0,pathTrajectory-math.pi/2],self._path[pathNum])
-        
-    
-    def setInitPosition(self,pathNum=0,startPos=0):
-        '''
-        Sets the vehicles position to a position along the selected path
-        pathNum: index for which path the vehicle will be place upon (0 indexed)
-        startPos: valid values 0-1 (float) with 0 being the beginning of the path and 1 being the end of the path. For a closed path 0 and 1 are nearly the same position
-        '''
-        
-        pathPos = self._pathPositions[pathNum]
-        pathQuaternion = self._pathQuaternions[pathNum]
-        pathLen = self._pathLengths[pathNum]
-        
-        #Map starting position to valid values
-        startPathPos = startPos*max(pathLen)
-        
-        startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos)#Convert the position along path to an XYZ position in the path's frame
-        startPoint[2] = startPoint[2] +.2 #Offset in Z to keep vehicle above ground plane.
-
-        
-        lookAhead = 0.1
-        nextPos = startPathPos+lookAhead
-        #Compare to the final path position, wrap around if beyond that
-        if nextPos > pathLen[-1]:
-            nextPos = nextPos-pathLen[-1]
-        nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
-        
-        pathVector = np.subtract(nextNearestPoint,startPoint)
-        pathTrajectory = math.atan(pathVector[1]/pathVector[0])
-        
-        #Set the vehicle to the starting point
-        self._sim.setObjectPosition(self._egoVehicle,startPoint[:3],self._path[pathNum])
-        self._sim.setObjectOrientation(self._egoVehicle,[0,0,pathTrajectory-math.pi/2],self._path[pathNum])
+        self._sim.setObjectPosition(self._ego,startPoint[:3],self._lanes[pathNum])
+        self._sim.setObjectOrientation(self._ego,[0,0,pathTrajectory-pi/2],self._lanes[pathNum])
         
     
     def getTimeStepSize(self):
