@@ -86,6 +86,8 @@ class CoppeliaBridge:
 
         self._isEgoReady = True  
 
+        self.__iscrazy = False
+
         self.setSteering(self._d) 
         self.setVehicleSpeed(self._v) 
 
@@ -124,6 +126,9 @@ class CoppeliaBridge:
         '''
         self._sim.stopSimulation()
         self._isRunning = False
+    
+    def setSimStepping(self, value):
+        self._sim.setStepping(value)
 
     def getTime(self):
         '''
@@ -144,6 +149,11 @@ class CoppeliaBridge:
         if self._isRunning:
             self._sim.step()
 
+    def isRunning(self):
+        '''
+        Returns True if sim is running
+        '''
+        return self._isRunning
 
     # Section: Vehicle behavior     
     def getSteeringAngle(self):
@@ -183,7 +193,10 @@ class CoppeliaBridge:
 
         self._adjustDifferential()
     
-    def getOccupancyGrid(self):        
+    def getOccupancyGrid(self):  
+        '''
+        Returns a matrix of 0s and 1s. 0s indicate obstacles. 1s indicate free space
+        '''      
         maxDist = 1.5
         plot = False
 
@@ -250,6 +263,23 @@ class CoppeliaBridge:
         '''
         return self.getEgoPoseRelative(self._world)
     
+    def setVehiclePose(self, position, orientation):
+        '''
+        Set vehicle position and orientation in the world frame
+        '''
+        self._sim.setObjectPosition(self._egoVehicle, self._world, position)
+        self._sim.setObjectOrientation(self._egoVehicle, self._world, orientation)        
+
+    def resetVehicle(self):
+        '''
+        Reset vehicle controls
+        '''
+        self.setVehicleSpeed(0)
+        self.setSteering(0)
+
+    def checkEgoCollide(self):
+        pass
+    
     def getVehicleSpeed(self):
         '''
         Get the current motor speed
@@ -271,7 +301,10 @@ class CoppeliaBridge:
         throttle = helper.bound(throttle, -1.0, 1.0)                
         self.setVehicleSpeed(self._v + (throttle * self._ACC_MAX * self._timeStep))
     
-    def switchLane(self, laneNumber):             
+    def switchLane(self, laneNumber):   
+        '''
+        Switches Lane
+        '''          
         if self._laneCount > 0:
             if (laneNumber >= 0) and (laneNumber < self._laneCount):
                 self._currentLane = laneNumber
@@ -333,7 +366,8 @@ class CoppeliaBridge:
         # print(rot[2])
         orientErr =  helper.pipi(pathTrajectory - rot[2] + pi)
 
-        pErr = np.sqrt(np.sum(np.power(pathError[0:2], 2))) * (pathError[1]/abs(pathError[1]))        
+        # pErr = np.sqrt(np.sum(np.power(pathError[0:2], 2))) * (pathError[1]/abs(pathError[1]))     
+        pErr = np.linalg.norm(pathError[0:2])   
         # print(orientErr)
         return pErr, orientErr
     

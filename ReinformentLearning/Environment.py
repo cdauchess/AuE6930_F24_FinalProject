@@ -39,10 +39,7 @@ class RLEnvironment:
         self.path_errors = []
         
         # Store initial state
-        self._initial_position = self.bridge._sim.getObjectPosition(
-            self.bridge._egoVehicle, self.bridge._world)
-        self._initial_orientation = self.bridge._sim.getObjectOrientation(
-            self.bridge._egoVehicle, self.bridge._world)
+        self._initial_position, self._initial_orientation  = self.bridge.getEgoPoseAbsolute() 
         
         #Reward Function Configuration
         #TODO - pass maximum speed and lane width
@@ -60,7 +57,7 @@ class RLEnvironment:
         time.sleep(0.1)
         
         # Reset simulation settings
-        self.bridge._sim.setStepping(True)
+        self.bridge.setSimStepping(True)
         
         # Start new simulation
         self.bridge.startSimulation()
@@ -129,10 +126,10 @@ class RLEnvironment:
     def _get_observation(self) -> Dict:
         """Get current state observation"""
         vehicle_state = self.bridge.getVehicleState()
-        path_error, orient_error = self.bridge.getPathError(self.bridge.activePath)
+        path_error, orient_error = self.bridge.getPathError()
         
         # Store path error for statistics
-        self.path_errors.append(np.linalg.norm(path_error))
+        self.path_errors.append(path_error)
         
         return {
             'position': vehicle_state['Position'],

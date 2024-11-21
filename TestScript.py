@@ -5,8 +5,6 @@ import random
 import time
 import numpy as np
 
-
-
 def runSim(bridge: CoppeliaBridge, duration, startPoint):
     bridge.startSimulation()
     bridge.setSpeed(5)
@@ -63,8 +61,8 @@ def runSimRenderTest(bridge:CoppeliaBridge, numRuns, duration):
     return renderTimes, noRenderTimes
 
 
-bridge = CoppeliaBridge(2)
-render, noRender = runSimRenderTest(bridge,10, 30)
+bridge = CoppeliaBridge()
+render, noRender = runSimRenderTest(bridge, 10, 30)
 
 print('30 second simulation, mean render time: %0.2f S, mean no render time: %0.2f S' %(np.mean(render), np.mean(noRender)))
 
