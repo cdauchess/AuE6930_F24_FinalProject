@@ -136,6 +136,72 @@ class CoppeliaBridge:
         '''
         return self._sim.getSimulationTime()
     
+    def setInitPosition(self,pathNum=0,startPos=0):
+        '''
+        Sets the vehicles position to a position along the selected path
+        pathNum: index for which path the vehicle will be place upon (0 indexed)
+        startPos: valid values 0-1 (float) with 0 being the beginning of the path and 1 being the end of the path. For a closed path 0 and 1 are nearly the same position
+        '''
+        
+        pathPos = self._pathPositions[pathNum]
+        pathQuaternion = self._pathQuaternions[pathNum]
+        pathLen = self._pathLengths[pathNum]
+        
+        #Map starting position to valid values
+        startPathPos = startPos*max(pathLen)
+        
+        startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos)#Convert the position along path to an XYZ position in the path's frame
+        startPoint[2] = startPoint[2] +.2 #Offset in Z to keep vehicle above ground plane.
+
+        
+        lookAhead = 0.1
+        nextPos = startPathPos+lookAhead
+        #Compare to the final path position, wrap around if beyond that
+        if nextPos > pathLen[-1]:
+            nextPos = nextPos-pathLen[-1]
+        nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
+        
+        pathVector = np.subtract(nextNearestPoint,startPoint)
+        pathTrajectory = math.atan(pathVector[1]/pathVector[0])
+        
+        #Set the vehicle to the starting point
+        self._sim.setObjectPosition(self._egoVehicle,startPoint[:3],self._path[pathNum])
+        self._sim.setObjectOrientation(self._egoVehicle,[0,0,pathTrajectory-math.pi/2],self._path[pathNum])
+        
+    
+    def setInitPosition(self,pathNum=0,startPos=0):
+        '''
+        Sets the vehicles position to a position along the selected path
+        pathNum: index for which path the vehicle will be place upon (0 indexed)
+        startPos: valid values 0-1 (float) with 0 being the beginning of the path and 1 being the end of the path. For a closed path 0 and 1 are nearly the same position
+        '''
+        
+        pathPos = self._pathPositions[pathNum]
+        pathQuaternion = self._pathQuaternions[pathNum]
+        pathLen = self._pathLengths[pathNum]
+        
+        #Map starting position to valid values
+        startPathPos = startPos*max(pathLen)
+        
+        startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos)#Convert the position along path to an XYZ position in the path's frame
+        startPoint[2] = startPoint[2] +.2 #Offset in Z to keep vehicle above ground plane.
+
+        
+        lookAhead = 0.1
+        nextPos = startPathPos+lookAhead
+        #Compare to the final path position, wrap around if beyond that
+        if nextPos > pathLen[-1]:
+            nextPos = nextPos-pathLen[-1]
+        nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
+        
+        pathVector = np.subtract(nextNearestPoint,startPoint)
+        pathTrajectory = math.atan(pathVector[1]/pathVector[0])
+        
+        #Set the vehicle to the starting point
+        self._sim.setObjectPosition(self._egoVehicle,startPoint[:3],self._path[pathNum])
+        self._sim.setObjectOrientation(self._egoVehicle,[0,0,pathTrajectory-math.pi/2],self._path[pathNum])
+        
+    
     def getTimeStepSize(self):
         '''
         Gets step size set in CoppeliaSim simulator
@@ -370,6 +436,30 @@ class CoppeliaBridge:
         pErr = np.linalg.norm(pathError[0:2])   
         # print(orientErr)
         return pErr, orientErr
+    
+    def vehicleCollection(self):
+        self.vehicleCol =self._sim.createCollection(0)
+        self._sim.addItemToCollection(self.vehicleCol,self._sim.handle_tree, self._egoVehicle,0)
+    
+    def getCollision(self,vehicle, object = None):
+        '''
+        Check if the specified vehicle has collided with the specified object. Leave object empty if it is to be checked against everything in the environment
+        Specific object handling is WIP
+        '''
+        if object == None: #If nothing specified, check against all objects
+            object = self._sim.handle_all
+        res, dist, point,obj, n = self._sim.handleProximitySensor(self._proxSens)
+        #TODO
+        #Collision detection isn't working as it should. Using prox sensor above for now.
+        #result, colideObj = self._sim.checkCollision(self._vehicleCollide,object)
+        
+        return res
+    
+    def checkEgoCollide(self):
+        '''
+        Check is the ego vehicle has collided with anything in the environment
+        '''
+        return self.getCollision(self._egoVehicle)
     
     def getVehicleState(self):
         '''
