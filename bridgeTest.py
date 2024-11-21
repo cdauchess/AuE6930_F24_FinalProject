@@ -19,7 +19,7 @@ runTime = 5
 switch = False
 
 while bridge._isRunning and (curTime < runTime):    
-    bridge.stepTime()
+    bridge.stepTime()    
     curTime = bridge.getTime()
     og = bridge.getOccupancyGrid()
     
