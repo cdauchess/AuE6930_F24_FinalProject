@@ -234,11 +234,13 @@ class CoppeliaBridge:
             
             R = (self._l / tan(d_abs))           
 
-            dl = sign * atan2(self._l, (R - self._tf/2))
-            dr = sign * atan2(self._l, (R + self._tf/2))
+            dl = sign * atan2(self._l, (R - sign * self._tf/2))
+            dr = sign * atan2(self._l, (R + sign * self._tf/2))
         
+        print("Left : {}, Right: {}".format(dl, dr))
+
         self._sim.setJointTargetPosition(self._lSteerAxis, dl)
-        self._sim.setJointTargetPosition(self._rSteerAxis, dr)
+        self._sim.setJointTargetPosition(self._rSteerAxis, dr)        
 
         self._adjustDifferential()
     
