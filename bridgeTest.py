@@ -1,6 +1,7 @@
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
 import matplotlib.pyplot as plt
 from math import sin, pi, degrees, atan2, radians
+# plt.ion()
 
 bridge = CoppeliaBridge()
 
@@ -9,7 +10,7 @@ bridge.initScene()
 
 bridge.startSimulation()
 
-# bridge.setVehicleSpeed(1)
+bridge.setVehicleSpeed(0.5)
 
 curTime = 0
 runTime = 5
@@ -21,8 +22,11 @@ switch = False
 while bridge._isRunning and (curTime < runTime):    
     bridge.stepTime()    
     curTime = bridge.getTime()
+    
     og = bridge.getOccupancyGrid()
     
+    # plt.plot(og)
+    # plt.draw()
     # # bridge.setMotion(1)
     # # bridge.getEgoPoseAbsolute()
     

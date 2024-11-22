@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 from skimage.draw import polygon
 from math import pi, tan, atan2, radians, remainder, atan
-#plt.ion()
+# plt.ion()
 '''
 TODO:
 Path Error Determination:
@@ -34,16 +34,19 @@ class CoppeliaBridge:
         
         self._world = self._sim.getObject('/Floor')
 
-        self._fig = plt.figure()
-        self._plotter = self._fig.add_subplot(121)
-        self._img     = self._fig.add_subplot(122)
-        # self._img.invert_yaxis()
+        self._plot = False
 
-        self._plotter.set_xlim(-1.5, 1.5)
-        self._plotter.set_ylim(-1.5, 1.5)     
+        if self._plot:
+            self._fig = plt.figure()
+            self._plotter = self._fig.add_subplot(121)
+            self._img     = self._fig.add_subplot(122)
+            # self._img.invert_yaxis()
 
-        # self._img.set_xlim(0, 360)
-        # self._img.set_ylim(0, 360)        
+            self._plotter.set_xlim(-1.5, 1.5)
+            self._plotter.set_ylim(-1.5, 1.5)     
+
+            # self._img.set_xlim(0, 360)
+            # self._img.set_ylim(0, 360)        
         
     def initEgo(self):
         # Motion Constraints
@@ -237,7 +240,7 @@ class CoppeliaBridge:
             dl = sign * atan2(self._l, (R - sign * self._tf/2))
             dr = sign * atan2(self._l, (R + sign * self._tf/2))
         
-        print("Left : {}, Right: {}".format(dl, dr))
+        # print("Left : {}, Right: {}".format(dl, dr))
 
         self._sim.setJointTargetPosition(self._lSteerAxis, dl)
         self._sim.setJointTargetPosition(self._rSteerAxis, dr)        
@@ -249,8 +252,7 @@ class CoppeliaBridge:
         Returns a matrix of 0s and 1s. 0s indicate obstacles. 1s indicate free space
         '''      
         maxDist = 1.5
-        plot = False
-
+        
         rawDataL, resL = self._sim.getVisionSensorDepth(self._leftSensor, 1)
         rawDataF, resF = self._sim.getVisionSensorDepth(self._frontSensor, 1)
         rawDataR, resR = self._sim.getVisionSensorDepth(self._rightSensor, 1)
@@ -259,16 +261,16 @@ class CoppeliaBridge:
         divs = np.arange(-maxDist, maxDist, 2*maxDist/resL[0]) / maxDist
 
         # 2 rows of data                
-        xL = -np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1])[1]                
+        xL = -np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1])
         yL = -xL * divs
         
-        yF = np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1])[1]
+        yF = np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1])
         xF =  yF * divs
 
-        xR = np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1])[1]
+        xR = np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1])
         yR = -xR * divs
        
-        yB = -np.reshape(self._sim.unpackFloatTable(rawDataB), [resB[1], -1])[1]
+        yB = -np.reshape(self._sim.unpackFloatTable(rawDataB), [resB[1], -1])
         xB =  yB * divs
                 
         x = np.append(np.append(np.append(xL, xF), xR), xB)
@@ -281,7 +283,7 @@ class CoppeliaBridge:
         rr, cc = polygon(xImg, yImg, og.shape)
         og[cc, rr] = 1
 
-        if(plot):
+        if(self._plot):
             self._plotter.clear()                            
             self._plotter.plot(x, y, 'k')            
             self._plotter.axis('square')
@@ -318,8 +320,8 @@ class CoppeliaBridge:
         '''
         Set vehicle position and orientation in the world frame
         '''
-        self._sim.setObjectPosition(self._egoVehicle, self._world, position)
-        self._sim.setObjectOrientation(self._egoVehicle, self._world, orientation)        
+        self._sim.setObjectPosition(self._ego, self._world, position)
+        self._sim.setObjectOrientation(self._ego, self._world, orientation)        
 
     def resetVehicle(self):
         '''
@@ -383,6 +385,8 @@ class CoppeliaBridge:
             vl = self._v * (R - (sign * self._t/2)) / R
             vr = self._v * (R + (sign * self._t/2)) / R
 
+        print("Left: {}, Right: {}".format(-vl, vr))
+
         self._sim.setJointTargetVelocity(self._lDriveWheel, -vl/self._r)
         self._sim.setJointTargetVelocity(self._rDriveWheel,  vr/self._r)
         
@@ -444,7 +448,7 @@ class CoppeliaBridge:
         '''
         Check is the ego vehicle has collided with anything in the environment
         '''
-        return self.getCollision(self._egoVehicle)
+        return self.getCollision(self._ego)
     
     def getVehicleState(self):
         '''
