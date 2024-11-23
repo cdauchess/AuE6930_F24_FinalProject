@@ -503,9 +503,6 @@ class CoppeliaBridge:
         if object == None: #If nothing specified, check against all objects
             object = self._sim.handle_all
         res, dist, point,obj, n = self._sim.handleProximitySensor(self._proxSens)
-        #TODO
-        #Collision detection isn't working as it should. Using prox sensor above for now.
-        #result, colideObj = self._sim.checkCollision(self._vehicleCollide,object)
         
         return res
     
