@@ -9,7 +9,7 @@ import time
 
 def train_agent(num_episodes: int = 100):
     # Create environment
-    bridge = CoppeliaBridge(2)
+    bridge = CoppeliaBridge()
     config = EpisodeConfig(
         max_steps=200,
         position_range=1.0,
