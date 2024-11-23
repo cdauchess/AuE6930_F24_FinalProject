@@ -1,4 +1,5 @@
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
+from .Reward import RLReward
 
 import random
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ class EpisodeConfig:
     orientation_range: float = 0.5
     max_path_error: float = 5.0
     time_step: float = 0.05
+    renderEnabled = True
 
 @dataclass
 class EpisodeStats:
@@ -38,10 +40,11 @@ class RLEnvironment:
         self.path_errors = []
         
         # Store initial state
-        self._initial_position = self.bridge._sim.getObjectPosition(
-            self.bridge._egoVehicle, self.bridge._world)
-        self._initial_orientation = self.bridge._sim.getObjectOrientation(
-            self.bridge._egoVehicle, self.bridge._world)
+        self._initial_position, self._initial_orientation  = self.bridge.getEgoPoseAbsolute() 
+        
+        #Reward Function Configuration
+        #TODO - pass maximum speed and lane width
+        self.rewardFunctions = RLReward()
 
     def reset(self, randomize: bool = True) -> Dict:
         """
@@ -52,16 +55,17 @@ class RLEnvironment:
         self.bridge.stopSimulation()
         
         # Wait a small amount of time to ensure proper cleanup
-        time.sleep(0.1)
+        time.sleep(0.5)
         
         # Reset simulation settings
-        self.bridge._sim.setStepping(True)
+        self.bridge.setSimStepping(True)
         
         # Start new simulation
         self.bridge.startSimulation()
+        self.bridge.renderState(self.config.renderEnabled)
         
         # Wait for simulation to stabilize
-        time.sleep(0.1)
+        time.sleep(0.5)
         
         # Reset episode tracking
         self.current_step = 0
@@ -97,7 +101,7 @@ class RLEnvironment:
         """
         # Apply action
         speed, steering = action
-        self.bridge.setSpeed(speed)
+        self.bridge.setVehicleSpeed(speed)
         self.bridge.setSteering(steering)
         
         # Step simulation
@@ -105,6 +109,7 @@ class RLEnvironment:
         self.current_step += 1
         
         # Get new state and calculate reward
+        self.og = self.bridge.getOccupancyGrid()
         new_state = self._get_observation()
         reward = self._calculate_reward(new_state)
         self.episode_reward += reward
@@ -124,10 +129,10 @@ class RLEnvironment:
     def _get_observation(self) -> Dict:
         """Get current state observation"""
         vehicle_state = self.bridge.getVehicleState()
-        path_error, orient_error = self.bridge.getPathError(self.bridge.activePath)
+        path_error, orient_error = self.bridge.getPathError()
         
         # Store path error for statistics
-        self.path_errors.append(np.linalg.norm(path_error))
+        self.path_errors.append(path_error)
         
         return {
             'position': vehicle_state['Position'],
@@ -141,6 +146,7 @@ class RLEnvironment:
 
     def _calculate_reward(self, state: Dict) -> float:
         """Calculate reward for current state"""
+        '''
         path_error = state['path_error']
         steering = state['steering']
         
@@ -148,17 +154,17 @@ class RLEnvironment:
         distance_error = np.linalg.norm(path_error)
         path_reward = -distance_error
         steering_penalty = -0.1 * abs(steering/self.bridge._maxSteerAngle)
+        '''
         
-        return path_reward + steering_penalty
+        return self.rewardFunctions.calcReward(state)
 
     def _is_done(self, state: Dict) -> bool:
         """Check if episode should terminate"""
         # Check termination conditions
         max_steps_reached = self.current_step >= self.config.max_steps
-        path_error = np.linalg.norm(state['path_error'])
+        path_error = state['path_error']
         off_track = path_error > self.config.max_path_error
-        # TODO: Add collision detection
-        collided = self.bridge.checkEgoCollide()
+        collided = self.bridge.checkEgoCollide(self.og)
         
         return max_steps_reached or off_track or collided
 

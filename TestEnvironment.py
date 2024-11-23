@@ -5,7 +5,7 @@ import time
 
 def test_rl_environment():
     # Create bridge and environment
-    bridge = CoppeliaBridge(2)
+    bridge = CoppeliaBridge()
     
     # Create custom configuration
     config = EpisodeConfig(
@@ -27,13 +27,13 @@ def test_rl_environment():
         state = env.reset(randomize=True)
         print("Reset complete.")
         print(f"Initial state: {state}")
-        print(f"Simulation running: {bridge._isRunning}")
+        print(f"Simulation running: {bridge.isRunning()}")
         
         # Run episode
         done = False
         while not done:
             # Simple test policy
-            action = (10.0, 0.2 * np.sin(env.current_step * 0.1))
+            action = (1, 0.2 * np.sin(env.current_step * 0.1))
             
             # Step environment
             new_state, reward, done, info = env.step(action)
