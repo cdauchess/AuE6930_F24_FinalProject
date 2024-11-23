@@ -15,6 +15,7 @@ class EpisodeConfig:
     orientation_range: float = 0.5
     max_path_error: float = 5.0
     time_step: float = 0.05
+    renderEnabled = True
 
 @dataclass
 class EpisodeStats:
@@ -54,16 +55,17 @@ class RLEnvironment:
         self.bridge.stopSimulation()
         
         # Wait a small amount of time to ensure proper cleanup
-        time.sleep(0.1)
+        time.sleep(0.5)
         
         # Reset simulation settings
         self.bridge.setSimStepping(True)
         
         # Start new simulation
         self.bridge.startSimulation()
+        self.bridge.renderState(self.config.renderEnabled)
         
         # Wait for simulation to stabilize
-        time.sleep(0.1)
+        time.sleep(0.5)
         
         # Reset episode tracking
         self.current_step = 0
@@ -99,7 +101,7 @@ class RLEnvironment:
         """
         # Apply action
         speed, steering = action
-        self.bridge.setSpeed(speed)
+        self.bridge.setVehicleSpeed(speed)
         self.bridge.setSteering(steering)
         
         # Step simulation
@@ -107,6 +109,7 @@ class RLEnvironment:
         self.current_step += 1
         
         # Get new state and calculate reward
+        self.og = self.bridge.getOccupancyGrid()
         new_state = self._get_observation()
         reward = self._calculate_reward(new_state)
         self.episode_reward += reward
@@ -159,10 +162,9 @@ class RLEnvironment:
         """Check if episode should terminate"""
         # Check termination conditions
         max_steps_reached = self.current_step >= self.config.max_steps
-        path_error = np.linalg.norm(state['path_error'])
+        path_error = state['path_error']
         off_track = path_error > self.config.max_path_error
-        # TODO: Add collision detection
-        collided = self.bridge.checkEgoCollide()
+        collided = self.bridge.checkEgoCollide(self.og)
         
         return max_steps_reached or off_track or collided
 
