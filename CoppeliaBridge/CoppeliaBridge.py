@@ -385,7 +385,7 @@ class CoppeliaBridge:
             vl = self._v * (R - (sign * self._t/2)) / R
             vr = self._v * (R + (sign * self._t/2)) / R
 
-        print("Left: {}, Right: {}".format(-vl, vr))
+        # print("Left: {}, Right: {}".format(-vl, vr))
 
         self._sim.setJointTargetVelocity(self._lDriveWheel, -vl/self._r)
         self._sim.setJointTargetVelocity(self._rDriveWheel,  vr/self._r)
