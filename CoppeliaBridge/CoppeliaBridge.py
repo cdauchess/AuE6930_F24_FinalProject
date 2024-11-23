@@ -5,8 +5,8 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import matplotlib.pyplot as plt
 
-from skimage.draw import polygon
-from math import pi, tan, atan2, radians, remainder, atan
+from skimage.draw import polygon, line
+from math import pi, tan, atan2, radians, remainder, atan, sin, cos
 # plt.ion()
 '''
 TODO:
@@ -34,7 +34,7 @@ class CoppeliaBridge:
         
         self._world = self._sim.getObject('/Floor')
 
-        self._plot = False
+        self._plot = True
 
         if self._plot:
             self._fig = plt.figure()
@@ -258,9 +258,40 @@ class CoppeliaBridge:
 
         self._adjustDifferential()
     
+    def pathForOG(self, ogDim = (180,180)):
+        '''
+        Return points in the occupancy grid that represent the path
+        '''
+        ogSizeX = ogDim[0]
+        ogSizeY = ogDim[1]
+        MperPx = (ogSizeX/2)/1.5
+        pathError, orientError = self.getPathErrorPos()
+        
+        xPt = [pathError[0]]
+        yPt = [pathError[1]]
+        
+        #Calculate the next point on the path relative to the vehicle
+        xPt.append(self._lookAhead*sin(orientError)+xPt[0])
+        yPt.append(self._lookAhead*cos(orientError)+yPt[0])
+        
+        #Cast to int and scale to pixel frame
+        xPt = [int((val*MperPx)+(ogSizeX/2)) for val in xPt]
+        yPt = [int((-1*val*MperPx)+(ogSizeY/2)) for val in yPt] #Negate Y due to occupancy grid more positive Y being behind the vehicle.
+        
+        #Bound the points to the size of the occupancy grid
+        xPt = np.clip(xPt,0,ogSizeX)
+        yPt = np.clip(yPt,0,ogSizeY)
+        
+        rr,cc = line(xPt[0], yPt[0], xPt[1], yPt[1])
+        
+        return rr,cc
+        
+    
     def getOccupancyGrid(self):  
         '''
         Returns a matrix of 0s and 1s. 0s indicate obstacles. 1s indicate free space
+        2 indicates path position
+        3 indicates path and obstacle occupying the same space
         '''      
         maxDist = 1.5
         
@@ -280,7 +311,7 @@ class CoppeliaBridge:
 
         xR = np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1])
         yR = -xR * divs
-       
+
         yB = -np.reshape(self._sim.unpackFloatTable(rawDataB), [resB[1], -1])
         xB =  yB * divs
                 
@@ -293,6 +324,10 @@ class CoppeliaBridge:
         og = np.zeros((resL[0], resL[0]), 'uint8')
         rr, cc = polygon(xImg, yImg, og.shape)
         og[cc, rr] = 1
+        
+        #Add path information to the occupancy grid
+        rrP, ccP = self.pathForOG(np.shape(og))
+        og[ccP,rrP]+=2
 
         if(self._plot):
             self._plotter.clear()                            
@@ -401,9 +436,18 @@ class CoppeliaBridge:
         self._sim.setJointTargetVelocity(self._lDriveWheel, -vl/self._r)
         self._sim.setJointTargetVelocity(self._rDriveWheel,  vr/self._r)
         
-    def getPathError(self):
+    def setLookAhead(self,lookahead):
+        if lookahead < 0:
+            self._lookAhead = 0
+        else:
+            self._lookAhead = lookahead
+            
+    def getLookAhead(self):
+        return self._lookAhead
+        
+    def getPathErrorPos(self):
         '''
-        Return the error relative to the closest point along the target path
+        Return the error relative to the closest point along the target path (XYZ component error)
         Returns orientation error as the rotation error about the z axis.
         '''
         #Get the path info of the current path
@@ -417,8 +461,8 @@ class CoppeliaBridge:
         
         pathError = np.subtract(nearPt, pos)
 
-        lookAhead = 0.1
-        nextPos = posAlongPath + lookAhead
+        self._lookAhead = 0.25
+        nextPos = posAlongPath + self._lookAhead
         
         #Compare to the final path position, wrap around if beyond that
         if nextPos > self._totalLength:
@@ -430,13 +474,21 @@ class CoppeliaBridge:
         pathTrajectory = atan2(pathVector[1], pathVector[0])        
         # print(pathTrajectory)
         # print(rot[2])
-        orientErr =  helper.pipi(pathTrajectory - rot[2] + pi)
+        orientErr =  -1*helper.pipi(pathTrajectory - rot[2])
 
-        # pErr = np.sqrt(np.sum(np.power(pathError[0:2], 2))) * (pathError[1]/abs(pathError[1]))     
+        return pathError, orientErr
+    
+    def getPathError(self):
+        '''
+        Returns the norm of the XYZ path error
+        '''
+        
+        pathError, orientErr = self.getPathErrorPos()
+        
         pErr = np.linalg.norm(pathError[0:2])
-        if pathError[1] < 0:
-            pErr*=-1  
-        # print(orientErr)
+        
+        if pathError[1] < 0: #Assign side of the path that we're on.
+            pErr*=-1 
         return pErr, orientErr
     
     def vehicleCollection(self):
