@@ -8,16 +8,7 @@ import matplotlib.pyplot as plt
 from skimage.draw import polygon, line
 from math import pi, tan, atan2, radians, remainder, atan, sin, cos
 # plt.ion()
-'''
-TODO:
-Path Error Determination:
-    Orientation Error. There is currently a coordinate system issue here.
-    
 
-Obstacle Positions:
-    Return distance vectors to obstacles "in view"
-    Return contact boolean
-'''
 
 # This class is a bridge between Coppelia Sim and Python
 class CoppeliaBridge:
@@ -279,8 +270,8 @@ class CoppeliaBridge:
         yPt = [int((-1*val*MperPx)+(ogSizeY/2)) for val in yPt] #Negate Y due to occupancy grid more positive Y being behind the vehicle.
         
         #Bound the points to the size of the occupancy grid
-        xPt = np.clip(xPt,0,ogSizeX)
-        yPt = np.clip(yPt,0,ogSizeY)
+        xPt = np.clip(xPt,0,ogSizeX-1)
+        yPt = np.clip(yPt,0,ogSizeY-1)
         
         rr,cc = line(xPt[0], yPt[0], xPt[1], yPt[1])
         
@@ -487,8 +478,8 @@ class CoppeliaBridge:
         
         pErr = np.linalg.norm(pathError[0:2])
         
-        if pathError[1] < 0: #Assign side of the path that we're on.
-            pErr*=-1 
+        #if pathError[1] < 0: #Assign side of the path that we're on.
+        #    pErr*=-1 
         return pErr, orientErr
     
     def vehicleCollection(self):

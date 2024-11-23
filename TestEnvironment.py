@@ -33,7 +33,7 @@ def test_rl_environment():
         done = False
         while not done:
             # Simple test policy
-            action = (10.0, 0.2 * np.sin(env.current_step * 0.1))
+            action = (1, 0.2 * np.sin(env.current_step * 0.1))
             
             # Step environment
             new_state, reward, done, info = env.step(action)
