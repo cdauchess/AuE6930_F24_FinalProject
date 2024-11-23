@@ -34,7 +34,7 @@ class CoppeliaBridge:
         
         self._world = self._sim.getObject('/Floor')
 
-        self._plot = True
+        self._plot = False
 
         if self._plot:
             self._fig = plt.figure()
@@ -289,7 +289,7 @@ class CoppeliaBridge:
     
     def getOccupancyGrid(self):  
         '''
-        Returns a matrix of 0s and 1s. 0s indicate obstacles. 1s indicate free space
+        Returns a matrix of 0s and 1s. 1s indicate obstacles. 0s indicate free space
         2 indicates path position
         3 indicates path and obstacle occupying the same space
         '''      
@@ -321,9 +321,9 @@ class CoppeliaBridge:
         xImg = np.array((x + maxDist) * resL[0] / (2 * maxDist), dtype=int)
         yImg = np.array(resL[0]- ((y + maxDist) * resL[0] / (2 * maxDist)), dtype=int)
 
-        og = np.zeros((resL[0], resL[0]), 'uint8')
+        og = np.ones((resL[0], resL[0]), 'uint8')
         rr, cc = polygon(xImg, yImg, og.shape)
-        og[cc, rr] = 1
+        og[cc, rr] = 0
         
         #Add path information to the occupancy grid
         rrP, ccP = self.pathForOG(np.shape(og))
@@ -509,11 +509,20 @@ class CoppeliaBridge:
         
         return res
     
-    def checkEgoCollide(self):
+    def checkEgoCollide(self, og):
         '''
         Check is the ego vehicle has collided with anything in the environment
+        Pass in the occupancy grid. Occupancy grid calculated each time for performance reasons
         '''
-        return self.getCollision(self._ego)
+        
+        #TODO: Confirm vehicle dimensions in the occupancy grid 70:110 is a bit of buffer
+        ogVehicle = og[70:110,70:110]
+        
+        #Check values in the "vehicle" Area
+        if 1 in ogVehicle or 3 in ogVehicle:
+            return True
+        else:
+            return False
     
     def getVehicleState(self):
         '''

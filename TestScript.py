@@ -28,7 +28,8 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint, renderEnable):
         else:
             bridge.setSteering(-0.2)
             
-        bridge.getOccupancyGrid()
+        og = bridge.getOccupancyGrid()
+        print(bridge.checkEgoCollide(og))
         pathError.append(pathErrorT)
         orientError.append(orientErrorT)
 
