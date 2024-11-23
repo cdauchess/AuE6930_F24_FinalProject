@@ -73,7 +73,7 @@ class CoppeliaBridge:
         self._v = 0                     # speed
         self._d = 0                     # steering Angle
         
-        self._ego = self._sim.getObject('/qcar/CoM')
+        self._ego = self._sim.getObject('/qcar')
         self._front = self._sim.getObject('/qcar/Front')
 
         self._lDriveWheel = self._sim.getObject('/qcar/base_wheelrl_joint')
@@ -185,7 +185,7 @@ class CoppeliaBridge:
         
         #Set the vehicle to the starting point
         self._sim.setObjectPosition(self._ego,startPoint[:3],self._lanes[pathNum])
-        self._sim.setObjectOrientation(self._ego,[0,0,pathTrajectory-pi/2],self._lanes[pathNum])
+        self._sim.setObjectOrientation(self._ego,[0,0,pathTrajectory],self._lanes[pathNum])
         
     
     def getTimeStepSize(self):
@@ -399,7 +399,7 @@ class CoppeliaBridge:
         pathPos = self._pathPoints     
         pathLen = self._pathLengths
         
-        pos, rot = self.getPose(self._front, self._world) #Find the pose of the center of the front axle
+        pos, rot = self.getPose(self._front, self._lanes[0]) #Find the pose of the center of the front axle
 
         posAlongPath = self._sim.getClosestPosOnPath(pathPos, pathLen, pos)
         nearPt = self._sim.getPathInterpolatedConfig(pathPos, pathLen, posAlongPath) #Convert the position along path to an XYZ position in the path's frame
@@ -422,7 +422,9 @@ class CoppeliaBridge:
         orientErr =  helper.pipi(pathTrajectory - rot[2] + pi)
 
         # pErr = np.sqrt(np.sum(np.power(pathError[0:2], 2))) * (pathError[1]/abs(pathError[1]))     
-        pErr = np.linalg.norm(pathError[0:2])   
+        pErr = np.linalg.norm(pathError[0:2])
+        if pathError[1] < 0:
+            pErr*=-1  
         # print(orientErr)
         return pErr, orientErr
     
