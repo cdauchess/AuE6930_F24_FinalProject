@@ -13,7 +13,7 @@ bridge.startSimulation()
 bridge.setVehicleSpeed(0.5)
 
 curTime = 0
-runTime = 5
+runTime = 30
 
 # bridge.switchLane(1)
 
