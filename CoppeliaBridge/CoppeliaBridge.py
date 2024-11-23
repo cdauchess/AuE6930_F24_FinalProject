@@ -46,7 +46,9 @@ class CoppeliaBridge:
             self._plotter.set_ylim(-1.5, 1.5)     
 
             # self._img.set_xlim(0, 360)
-            # self._img.set_ylim(0, 360)        
+            # self._img.set_ylim(0, 360)
+        self.initEgo()
+        self.initScene()
         
     def initEgo(self):
         # Motion Constraints
@@ -109,10 +111,11 @@ class CoppeliaBridge:
         self.switchLane(0)        
 
     # Section: Application behavior
-    def startSimulation(self):
+    def startSimulation(self, renderEnable = True):
         '''
         Starts CoppeliaSim simulator
         '''
+        self.renderState(renderEnable)
         self._sim.startSimulation()
         self._isRunning = True
 
@@ -206,6 +209,14 @@ class CoppeliaBridge:
         Returns True if sim is running
         '''
         return self._isRunning
+    
+    def renderState(self, render):
+        '''
+        Set if rendering is enabled or disabled
+        False = rendering disabled
+        True = rendering enabled
+        '''
+        self._sim.setBoolParam(self._sim.boolparam_display_enabled, render)
 
     # Section: Vehicle behavior     
     def getSteeringAngle(self):

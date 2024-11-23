@@ -5,9 +5,9 @@ import random
 import time
 import numpy as np
 
-def runSim(bridge: CoppeliaBridge, duration, startPoint):
-    bridge.initScene()
-    bridge.initEgo()
+def runSim(bridge: CoppeliaBridge, duration, startPoint, renderEnable):
+    #bridge.initScene()
+    #bridge.initEgo()
     bridge.startSimulation()
     bridge.setVehicleSpeed(0.5)
     bridge.setInitPosition(0,startPoint)
@@ -15,7 +15,6 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint):
     curTime = 0
     pathError = []
     orientError = []
-    
     while bridge._isRunning and (curTime<duration):
         bridge.stepTime()
         curTime = bridge.getTime()
@@ -48,33 +47,29 @@ def runSimRenderTest(bridge:CoppeliaBridge, numRuns, duration):
     
     for run in range(numRuns): #Run the sims
         start = time.time()
-        runSim(bridge,duration, startPos[run])
+        runSim(bridge,duration, startPos[run],True)
         end = time.time()
         renderTimes.append(end-start)
         print('Render Time: %0.2f' %(end-start))
-        
         time.sleep(1)
-
-        bridge._sim.setBoolParam(bridge._sim.boolparam_display_enabled, False)
+        
         start = time.time()
-        pathEr, orientEr = runSim(bridge,duration,startPos[run])
-        #plt.figure()
-        #plt.plot(pathEr)
+        pathEr, orientEr = runSim(bridge,duration,startPos[run],False)
         
         end = time.time()
         noRenderTimes.append(end-start)
         print('No Render Time: %0.2f' %(end-start))
-        bridge._sim.setBoolParam(bridge._sim.boolparam_display_enabled, True)
         
-        time.sleep(0.1)
+        time.sleep(1)
         
     return renderTimes, noRenderTimes
 
 
 bridge = CoppeliaBridge()
-render, noRender = runSimRenderTest(bridge, 5, 30)
+episodeDuration = 30
+render, noRender = runSimRenderTest(bridge, 5, episodeDuration)
 
-print('30 second simulation, mean render time: %0.2f S, mean no render time: %0.2f S' %(np.mean(render), np.mean(noRender)))
+print('%i second simulation, mean render time: %0.2f S, mean no render time: %0.2f S' %(episodeDuration, np.mean(render), np.mean(noRender)))
 
 fig = plt.figure()
 ax = plt.subplot(2,1,1)
