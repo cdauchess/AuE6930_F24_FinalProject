@@ -1,8 +1,11 @@
-from ReinformentLearning.NeuralNetworks import QNetwork
+from .NeuralNetworks import DualStreamQNetwork
+from .StateGenerator import VehicleState
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from collections import deque
 import random
 from dataclasses import dataclass
@@ -28,29 +31,53 @@ class ReplayBuffer:
     def __init__(self, capacity: int):
         self.buffer = deque(maxlen=capacity)
     
-    def push(self, state: np.ndarray, action: int, reward: float, 
-             next_state: np.ndarray, done: bool):
+    def push(self, state: 'VehicleState', action: int, reward: float, 
+             next_state: 'VehicleState', done: bool):
+        """Store transition in buffer"""
         self.buffer.append((state, action, reward, next_state, done))
     
     def sample(self, batch_size: int) -> Tuple:
+        """
+        Sample a batch of transitions
+        Returns tuple of (states, actions, rewards, next_states, dones)
+        """
         transitions = random.sample(self.buffer, batch_size)
         batch = list(zip(*transitions))
-        return [np.array(x) for x in batch]
+        
+        # Keep states and next_states as VehicleState objects
+        states = batch[0]
+        actions = np.array(batch[1])
+        rewards = np.array(batch[2])
+        next_states = batch[3]
+        dones = np.array(batch[4])
+        
+        return states, actions, rewards, next_states, dones
     
     def __len__(self) -> int:
         return len(self.buffer)
 
+
 class VehicleAgent:
-    """DQN Agent for vehicle control"""
+    """DQN Agent for vehicle control with dual-stream architecture"""
     def __init__(self, config: AgentConfig):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Networks
-        self.q_network = QNetwork(config.state_dim, config.action_dim, 
-                                config.hidden_dim).to(self.device)
-        self.target_network = QNetwork(config.state_dim, config.action_dim, 
-                                     config.hidden_dim).to(self.device)
+        self.q_network = DualStreamQNetwork(
+            vector_dim=5,  # orientation(1) + speed(1) + steering(1) + path_error(2)
+            grid_size=180,  # Size of occupancy grid
+            action_dim=config.action_dim,
+            hidden_dim=config.hidden_dim
+        ).to(self.device)
+        
+        self.target_network = DualStreamQNetwork(
+            vector_dim=5,
+            grid_size=180,
+            action_dim=config.action_dim,
+            hidden_dim=config.hidden_dim
+        ).to(self.device)
+        
         self.target_network.load_state_dict(self.q_network.state_dict())
         
         # Training components
@@ -61,15 +88,19 @@ class VehicleAgent:
         # Action space discretization
         self.speed_actions = np.array([0.0, 5.0, 10.0])  # m/s
         self.steering_actions = np.array([-0.2, 0.0, 0.2])  # rad
-        
-    def select_action(self, state: Dict) -> Tuple[float, float, int]:
+    
+    def select_action(self, state: VehicleState) -> Tuple[float, float, int]:
         """Select action using epsilon-greedy policy"""
         if random.random() < self.epsilon:
             action_idx = random.randrange(self.config.action_dim)
         else:
-            state_tensor = self._preprocess_state(state)
+            grid_input, vector_input = state.get_network_inputs()
+            # Add batch dimension and move to device
+            grid_input = grid_input.unsqueeze(0).to(self.device)
+            vector_input = vector_input.unsqueeze(0).to(self.device)
+            
             with torch.no_grad():
-                q_values = self.q_network(state_tensor)
+                q_values = self.q_network(grid_input, vector_input)
                 action_idx = q_values.argmax().item()
         
         # Convert action index to speed and steering
@@ -84,29 +115,57 @@ class VehicleAgent:
         if len(self.memory) < batch_size:
             return 0.0
         
-        # Sample batch and prepare tensors
+        # Sample batch
         states, actions, rewards, next_states, dones = self.memory.sample(batch_size)
-        states = torch.FloatTensor(states).to(self.device)
+        
+        # Process batch of states
+        grid_inputs = []
+        vector_inputs = []
+        next_grid_inputs = []
+        next_vector_inputs = []
+        
+        # Process each state in the batch
+        for state in states:
+            grid_input, vector_input = state.get_network_inputs()
+            grid_inputs.append(grid_input)
+            vector_inputs.append(vector_input)
+        
+        for next_state in next_states:
+            next_grid_input, next_vector_input = next_state.get_network_inputs()
+            next_grid_inputs.append(next_grid_input)
+            next_vector_inputs.append(next_vector_input)
+        
+        # Convert lists to batched tensors
+        grid_inputs = torch.stack(grid_inputs).to(self.device)
+        vector_inputs = torch.stack(vector_inputs).to(self.device)
+        next_grid_inputs = torch.stack(next_grid_inputs).to(self.device)
+        next_vector_inputs = torch.stack(next_vector_inputs).to(self.device)
+        
         actions = torch.LongTensor(actions).to(self.device)
         rewards = torch.FloatTensor(rewards).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.FloatTensor(dones).to(self.device)
         
         # Compute current Q values
-        current_q = self.q_network(states).gather(1, actions.unsqueeze(1))
+        current_q = self.q_network(grid_inputs, vector_inputs).gather(1, actions.unsqueeze(1))
         
         # Compute target Q values
         with torch.no_grad():
-            max_next_q = self.target_network(next_states).max(1)[0]
+            next_q = self.target_network(next_grid_inputs, next_vector_inputs)
+            max_next_q = next_q.max(1)[0]
             target_q = rewards + (1 - dones) * self.config.gamma * max_next_q
         
         # Compute loss and update
-        loss = nn.MSELoss()(current_q.squeeze(), target_q)
+        loss = F.mse_loss(current_q.squeeze(), target_q)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         
         return loss.item()
+    
+    def store_transition(self, state: VehicleState, action: int, 
+                        reward: float, next_state: VehicleState, done: bool):
+        """Store transition in replay buffer"""
+        self.memory.push(state, action, reward, next_state, done)
     
     def update_target_network(self):
         """Update target network weights"""
@@ -117,17 +176,6 @@ class VehicleAgent:
         self.epsilon = max(self.config.epsilon_end, 
                          self.epsilon * self.config.epsilon_decay)
     
-    def _preprocess_state(self, state: Dict) -> torch.Tensor:
-        """Convert state dict to tensor"""
-        state_array = np.concatenate([
-            state['position'],
-            [state['orientation'][2]],  # Only yaw angle
-            [state['speed']],
-            [state['steering']],
-            state['path_error'][:2]  # X and Y error
-        ])
-        return torch.FloatTensor(state_array).unsqueeze(0).to(self.device)
-
     def save(self, path: str):
         """Save model weights and training state"""
         torch.save({
@@ -137,7 +185,7 @@ class VehicleAgent:
             'epsilon': self.epsilon,
             'config': self.config
         }, path)
-        
+    
     def load(self, path: str):
         """Load model weights and training state"""
         checkpoint = torch.load(path)

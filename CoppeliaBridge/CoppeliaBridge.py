@@ -277,10 +277,11 @@ class CoppeliaBridge:
         
         return rr,cc
         
-    
     def getOccupancyGrid(self):  
         '''
-        Returns a matrix of 0s and 1s. 1s indicate obstacles. 0s indicate free space
+        Returns a matrix of integers. 
+        0s indicate free space
+        1s indicate obstacles. 
         2 indicates path position
         3 indicates path and obstacle occupying the same space
         '''      
