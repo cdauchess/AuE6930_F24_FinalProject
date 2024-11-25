@@ -1,6 +1,8 @@
 #  python -m pip install coppeliasim-zmqremoteapi-client
 #  python -m pip install scikit-learn
 #  python -m pip install -U scikit-image
+#  python -m pip install scikit-learn
+#  python -m pip install -U scikit-image
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import matplotlib.pyplot as plt
@@ -278,11 +280,10 @@ class CoppeliaBridge:
         
         return rr,cc
         
+    
     def getOccupancyGrid(self):  
         '''
-        Returns a matrix of integers. 
-        0s indicate free space
-        1s indicate obstacles. 
+        Returns a matrix of 0s and 1s. 1s indicate obstacles. 0s indicate free space
         2 indicates path position
         3 indicates path and obstacle occupying the same space
         '''      
