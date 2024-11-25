@@ -34,7 +34,7 @@ def train_agent(num_episodes: int = 100) -> Tuple[VehicleAgent, RLEnvironment]:
         epsilon_start=1.0,
         epsilon_end=0.01,
         epsilon_decay=0.995,
-        buffer_size=100000,
+        buffer_size=200000,
         batch_size=64,
         target_update=10
     )
@@ -47,7 +47,7 @@ def train_agent(num_episodes: int = 100) -> Tuple[VehicleAgent, RLEnvironment]:
     
     # Training loop
     for episode in range(num_episodes):
-        state = env.reset(randomize=True)
+        state = env.reset(randomize=False)
         episode_reward = 0
         episode_loss = 0
         
@@ -93,6 +93,8 @@ def train_agent(num_episodes: int = 100) -> Tuple[VehicleAgent, RLEnvironment]:
             print(f"  Epsilon: {agent.epsilon:.3f}")
             print(f"  Loss: {episode_loss:.3f}")
     
+    agent.save("agent_1000.pt")
+
     # Plot training metrics
     plot_training_metrics(episode_rewards, episode_losses, mean_path_errors)
     
@@ -181,7 +183,7 @@ def test_agent(agent: VehicleAgent, env: RLEnvironment, num_episodes: int = 5):
 if __name__ == "__main__":
     # Train agent
     print("Starting training...")
-    agent, env = train_agent(num_episodes=100)
+    agent, env = train_agent(num_episodes=10)
     
     # Test agent
     print("\nStarting testing...")

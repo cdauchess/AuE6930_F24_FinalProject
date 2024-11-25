@@ -14,16 +14,16 @@ from typing import Dict, List, Tuple
 @dataclass
 class AgentConfig:
     """Configuration for DQN Agent"""
-    state_dim: int = 8  # position(3), orientation(1), speed(1), steering(1), path_error(2)
-    action_dim: int = 9  # 3 steering le 3 speed levels ×vels
-    hidden_dim: int = 128
+    state_dim: int = 5  # orientation(1), speed(1), steering(1), path_error(2)
+    action_dim: int = 9  # 3 steering levels x 3 speed levels
+    hidden_dim: int = 256
     learning_rate: float = 0.001
     gamma: float = 0.99  # discount factor
     epsilon_start: float = 1.0
     epsilon_end: float = 0.01
     epsilon_decay: float = 0.995
-    buffer_size: int = 100000
-    batch_size: int = 64
+    buffer_size: int = 200000
+    batch_size: int = 128
     target_update: int = 10  # episodes between target network updates
 
 class ReplayBuffer:

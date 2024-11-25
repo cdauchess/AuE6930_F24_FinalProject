@@ -96,10 +96,13 @@ class RLEnvironment:
         new_state = VehicleState.from_bridge(self.bridge)
         
         # Calculate reward using reward function
-        reward = self.reward_function.calcReward({
+        reward = self.reward_function.calculate_reward({
             'speed': new_state.speed,
             'path_error': new_state.path_error[0],  # Using lateral error
-            'steering': new_state.steering
+            'orientation_error': new_state.path_error[1], # heading_error
+            'steering': new_state.steering,
+            'collision': self.bridge.checkEgoCollide(new_state.occupancy_grid),
+            'success': self._success(new_state)
         })
         
         self.episode_reward += reward
@@ -117,6 +120,10 @@ class RLEnvironment:
         
         return new_state, reward, done, info
 
+    def _success(self, state: VehicleState) -> bool:
+        """Chenck of the episode ended successfully"""
+        return self.current_step >= self.config.max_steps
+    
     def _is_done(self, state: VehicleState) -> bool:
         """Check if episode should terminate"""
         return (

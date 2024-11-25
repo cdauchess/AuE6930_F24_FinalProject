@@ -1,100 +1,173 @@
+from dataclasses import dataclass
+from typing import Dict, Callable, List, Optional
 import numpy as np
-import matplotlib.pyplot as plt
+
+@dataclass
+class RewardConfig:
+    """Configuration for reward calculation"""
+    # Vehicle limits
+    max_speed: float = 10.0      # m/s
+    max_path_error: float = 5.0  # meters
+    max_steering: float = 0.5    # radians
+    
+    # Component weights
+    speed_weight: float = 1.0
+    path_error_weight: float = 1.0
+    steering_weight: float = 0.5
+    
+    # Penalties and bonuses
+    collision_penalty: float = -10.0
+    zero_speed_penalty: float = -10.0
+    max_path_error_penalty: float = -10.0
+    success_reward: float = 10.0
 
 class RLReward:
-    def __init__(self,activeFunc:int = 0, maxSpeed = 10, laneWidth = 5):
-        #List of the reward functions
-        self.rewardFuncs = [self.reward0, self.reward1]
-        
-        self.setActiveReward(activeFunc)
-        self._maxSpeed = maxSpeed
-        self._laneWidth = laneWidth
-        
-        
-        
-    #Check range of the requested active function.
-    def setActiveReward(self, activeFunc:int):
-        if activeFunc < 0:
-            self._activeFunc = 0
-        elif  activeFunc >= len(self.rewardFuncs):
-            self._activeFunc = len(self.rewardFuncs)-1
-        else:
-            self._activeFunc = activeFunc
+    """Reinforcement Learning reward calculator with multiple reward functions"""
     
-    def calcReward(self, vehicleState:dict):
+    def __init__(self, config: Optional[RewardConfig] = None):
+        self.config = config or RewardConfig()
         
-        reward = self.rewardFuncs[self._activeFunc](vehicleState)
+        # Dictionary of available reward functions
+        self.reward_functions = {
+            'standard': self._standard_reward,
+            'simple': self._simple_reward,
+            'smooth': self._smooth_reward
+        }
         
+        # Default reward function
+        self.active_function = 'standard'
+    
+    def set_reward_function(self, function_name: str) -> bool:
+        """
+        Set the active reward function
+        """
+        if function_name in self.reward_functions:
+            self.active_function = function_name
+            return True
+        return False
+    
+    def calculate_reward(self, state: Dict) -> float:
+        """
+        Calculate reward based on vehicle state
+        """
+        # Validate input
+        required_keys = {'speed', 'path_error', 'orientation_error', 'steering', 'collision', 'success'}
+        if not all(key in state for key in required_keys):
+            raise ValueError(f"State must contain keys: {required_keys}")
+        
+        return self.reward_functions[self.active_function](state)
+    
+    def _speed_reward(self, speed: float) -> float:
+        """Calculate speed component of reward"""
+        if speed <= 0:
+            return self.config.zero_speed_penalty
+        return self.config.speed_weight * (speed / self.config.max_speed)
+    
+    def _path_error_reward(self, error: float) -> float:
+        """Calculate path error component of reward using smooth function"""
+        normalized_error = abs(error)
+        if normalized_error >= self.config.max_path_error:
+            return self.config.max_path_error_penalty
+        
+        # Smooth exponential decay
+        reward = (np.exp(-1.0 * normalized_error) - 1) * -self.config.max_path_error_penalty
+        return self.config.path_error_weight * reward
+    
+    def _orientation_reward(self, orientation: float) -> float:
+        # TODO: Calculate orientation component errror of reward
+        return 0
+    
+    def _steering_reward(self, steering: float) -> float:
+        # TODO: Calculate steering component to encourage smooth control
+        return 0
+    
+    def _simple_reward(self, state: Dict) -> float:
+        """
+        Simplified reward function focusing mainly on path following
+        """
+        reward = self._path_error_reward(state['path_error'])
+        
+        if state['collision']:
+            reward += self.config.collision_penalty
+            
+        return reward
+
+    def _standard_reward(self, state: Dict) -> float:
+        """
+        Standard reward function combining speed, and path following
+        """
+        reward = 0.0
+        
+        # Core components
+        reward += self._speed_reward(state['speed'])
+        reward += self._path_error_reward(state['path_error'])
+        
+        # Penalties and bonuses
+        if state['collision']:
+            reward += self.config.collision_penalty
+        
+        if state['success']:
+            reward += self.config.success_reward
+            
         return reward
     
-    def reward0(self,vehicleState: dict):
-        #Unpack vehicle state
-        speed = vehicleState['speed']
-        posError = np.linalg.norm(vehicleState['path_error'])
-        collision = 0 #Placeholder for now
+    def _smooth_reward(self, state: Dict) -> float:
         
-        #Pos Error Params
-        #The two piecewise elements connect at x=lanewidth
-        linExpoPt = 0.5 #Y value where the two piecewise elements connect.
-        yInt = 1 #Y intercept for the linear portion
-        exp = 2 #Expoential value for exponential portion
-        
-        #Move Incentive
-        if speed <= 0:
-            move = -10
-        else:
-            move = speed/self._maxSpeed #Normalize on max speed to keep scaling in check
-        
-        #Obstacle Avoidance Incentive
-        if collision == 1:
-            obstacle = -10
-        else:
-            obstacle = 0
-        
-        #Path Following
-        if abs(posError) < self._laneWidth:
-            m = (linExpoPt-yInt)/self._laneWidth
-            path = m*abs(posError)+yInt
-        else:
-            path = -1*((abs(posError)**exp) + (linExpoPt-(self._laneWidth**exp)))+linExpoPt*2
-            #path = -1*(exp**(abs(posError))+linExpoPt-(exp**self._laneWidth))+linExpoPt*2
-        #TODO - Consider saturating path part of the reward here
-        
-        return move + obstacle + path
-    
-    def reward1(self,vehicleState):
-        return -50
-    
-    #reward2, reward3, etc.
-    
-    
+        # TODO: Reward function emphasizing smooth control
 
-#Testing/Experimenting section
+        path_reward = self._path_error_reward(state['path_error'])
+        steering_reward = self._steering_reward(state['steering']) * 2.0  # Increased weight on smooth steering
+        speed_reward = self._speed_reward(state['speed']) * 0.5  # Reduced weight on speed
+        
+        reward = path_reward + steering_reward + speed_reward
+        
+        if state['collision']:
+            reward += self.config.collision_penalty
+        if state['success']:
+            reward += self.config.success_reward
+            
+        return reward
+
+    def get_available_functions(self) -> List[str]:
+        """Get list of available reward functions"""
+        return list(self.reward_functions.keys())
+
 if __name__ == "__main__":
-    rewardFunc = RLReward(0)
-    #print(rewardFunc.calcReward(5))
-    rewardFunc._activeFunc = 1
-    #print(rewardFunc.calcReward(5))
+    import matplotlib.pyplot as plt
     
-    laneWidth = 1
-    #Pos Error Params
-    linExpoPt = 0.5
-    yInt = 1
-    exp = 2   
+    # Create reward calculator with custom config
+    config = RewardConfig(
+        max_speed=10.0,
+        speed_weight=1.0,
+        path_error_weight=1.0,
+        steering_weight=0.5
+    )
+    reward_calc = RLReward(config)
     
-    x = np.linspace(-10,10,101)
-    y = []
+    # Plot path error reward function
+    errors = np.linspace(-5, 5, 200)
+    rewards = [reward_calc._path_error_reward(error) for error in errors]
     
-    for posError in x:
-        path = 0
-        if abs(posError) < laneWidth:
-            m = (linExpoPt-yInt)/laneWidth
-            path = m*abs(posError)+yInt
-        else:
-            path = -1*((abs(posError)**exp) + (linExpoPt-(laneWidth**exp)))+linExpoPt*2
-            #path = -1*(exp**(abs(posError))+linExpoPt-(exp**laneWidth))+linExpoPt*2
-        y.append(path)
-    
-    plt.plot(x,y)
+    plt.figure(figsize=(10, 6))
+    plt.plot(errors, rewards)
+    plt.title('Path Error Reward Function')
+    plt.xlabel('Path Error (m)')
+    plt.ylabel('Reward')
+    plt.grid(True)
     plt.show()
     
+    # Example usage
+    state = {
+        'speed': 5.0,
+        'path_error': 0.3,
+        'steering': 0.1,
+        'collision': False,
+        'success': False
+    }
+    
+    # Try different reward functions
+    print("\nReward values for example state:")
+    for func_name in reward_calc.get_available_functions():
+        reward_calc.set_reward_function(func_name)
+        reward = reward_calc.calculate_reward(state)
+        print(f"{func_name}: {reward:.3f}")

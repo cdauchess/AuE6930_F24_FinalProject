@@ -102,7 +102,7 @@ class CoppeliaBridge:
         self.switchLane(0)        
 
     # Section: Application behavior
-    def startSimulation(self, renderEnable = True):
+    def startSimulation(self, renderEnable = False):
         '''
         Starts CoppeliaSim simulator
         '''
@@ -207,7 +207,8 @@ class CoppeliaBridge:
         False = rendering disabled
         True = rendering enabled
         '''
-        self._sim.setBoolParam(self._sim.boolparam_display_enabled, render)
+        #self._sim.setBoolParam(self._sim.boolparam_display_enabled, render)
+        pass
 
     # Section: Vehicle behavior     
     def getSteeringAngle(self):
