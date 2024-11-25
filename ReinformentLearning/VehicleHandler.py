@@ -5,6 +5,21 @@ from typing import Dict, Tuple, List, Optional, NamedTuple
 import numpy as np
 import torch
 
+@dataclass
+class VehicleAction:
+    """Representation of vehicle control actions"""
+    steering: float  # steering angle in radians
+    acceleration: float  # acceleration in m/s^2
+
+    def to_numpy(self):
+        """Convert to numpy array for network processing"""
+        return np.array([self.steering, self.acceleration], dtype=np.float32)
+
+    @classmethod
+    def from_numpy(cls, array):
+        """Create action from numpy array"""
+        return cls(steering=float(array[0]), acceleration=float(array[1]))
+
 class VehicleState(NamedTuple):
     """Representation of vehicle state"""
     position: np.ndarray          # [x, y, z] (kept for other uses but not part of network input)
@@ -31,11 +46,7 @@ class VehicleState(NamedTuple):
         )
     
     def get_network_inputs(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Convert state to network inputs (grid and vector components)
-        Returns:
-            Tuple of (occupancy_grid_tensor, dynamics_tensor)
-        """
+
         # Process occupancy grid - ensure shape is [1, H, W]
         grid_tensor = torch.FloatTensor(self.occupancy_grid).unsqueeze(0)
         

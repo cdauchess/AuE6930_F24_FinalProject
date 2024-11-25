@@ -1,25 +1,7 @@
-from dataclasses import dataclass
+from .Configs import RewardConfig
+
 from typing import Dict, Callable, List, Optional
 import numpy as np
-
-@dataclass
-class RewardConfig:
-    """Configuration for reward calculation"""
-    # Vehicle limits
-    max_speed: float = 10.0      # m/s
-    max_path_error: float = 5.0  # meters
-    max_steering: float = 0.5    # radians
-    
-    # Component weights
-    speed_weight: float = 1.0
-    path_error_weight: float = 1.0
-    steering_weight: float = 0.5
-    
-    # Penalties and bonuses
-    collision_penalty: float = -10.0
-    zero_speed_penalty: float = -10.0
-    max_path_error_penalty: float = -10.0
-    success_reward: float = 10.0
 
 class RLReward:
     """Reinforcement Learning reward calculator with multiple reward functions"""

@@ -4,29 +4,10 @@ import numpy as np
 import time
 import random
 
+from .Configs import EpisodeConfig, EpisodeStats
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
-from .StateGenerator import VehicleState
+from .VehicleHandler import VehicleState, VehicleAction
 from .RewardCalculator import RLReward
-
-@dataclass
-class EpisodeConfig:
-    """Configuration for RL episodes"""
-    max_steps: int = 100
-    position_range: float = 1.0
-    orientation_range: float = 0.5
-    max_path_error: float = 5.0
-    time_step: float = 0.05
-    render_enabled: bool = True
-
-@dataclass
-class EpisodeStats:
-    """Statistics for an episode"""
-    episode_number: int
-    steps: int
-    total_reward: float
-    mean_path_error: float
-    max_path_error: float
-    success: bool
 
 class RLEnvironment:
     """RL Environment wrapper for CoppeliaBridge"""
@@ -42,6 +23,7 @@ class RLEnvironment:
         
         # Initial pose - we'll get this once during initialization
         self.initial_pose = self._get_initial_pose()
+
         
         # Reward function
         self.reward_function = RLReward()
@@ -81,12 +63,11 @@ class RLEnvironment:
         # Return initial state
         return VehicleState.from_bridge(self.bridge)
 
-    def step(self, action: Tuple[float, float]) -> Tuple[VehicleState, float, bool, Dict]:
+    def step(self, action: VehicleAction) -> Tuple[VehicleState, float, bool, Dict]:
         """Execute action and return new state, reward, done flag, and info"""
         # Apply action
-        speed, steering = action
-        self.bridge.setVehicleSpeed(speed)
-        self.bridge.setSteering(steering)
+        self.bridge.setVehicleSpeed(action.acceleration)
+        self.bridge.setSteering(action.steering)
         
         # Step simulation
         self.bridge.stepTime()
@@ -121,8 +102,11 @@ class RLEnvironment:
         return new_state, reward, done, info
 
     def _success(self, state: VehicleState) -> bool:
-        """Chenck of the episode ended successfully"""
-        return self.current_step >= self.config.max_steps
+        """Episode succeeds if path completed within error bounds"""
+        return (
+            self.current_step >= self.config.max_steps and
+            abs(state.path_error[0]) < self.config.max_path_error * 0.5
+        )
     
     def _is_done(self, state: VehicleState) -> bool:
         """Check if episode should terminate"""
