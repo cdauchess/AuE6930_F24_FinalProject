@@ -19,11 +19,11 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint, renderEnable):
         bridge.stepTime()
         curTime = bridge.getTime()
         #print(curTime)
-        pathErrorT,orientErrorT = bridge.getPathError()
+        pathErrorT,orientErrorT = bridge.getPathErrorPos()
         #print(pathErrorT)
         
         #Simple Steering Controller for testing bridge functionality
-        if pathErrorT < 0:
+        if pathErrorT[1] < 0:
             bridge.setSteering(0.2)
         else:
             bridge.setSteering(-0.2)
@@ -68,7 +68,7 @@ def runSimRenderTest(bridge:CoppeliaBridge, numRuns, duration):
 
 bridge = CoppeliaBridge()
 episodeDuration = 30
-render, noRender = runSimRenderTest(bridge, 5, episodeDuration)
+render, noRender = runSimRenderTest(bridge, 1, episodeDuration)
 
 print('%i second simulation, mean render time: %0.2f S, mean no render time: %0.2f S' %(episodeDuration, np.mean(render), np.mean(noRender)))
 
