@@ -7,7 +7,7 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import matplotlib.pyplot as plt
 
-from skimage.draw import polygon, line
+from skimage.draw import polygon, line, bezier_curve
 from math import pi, tan, atan2, radians, remainder, atan, sin, cos
 # plt.ion()
 
@@ -20,7 +20,7 @@ class CoppeliaBridge:
         self._isEgoReady = False
         
         self._client = RemoteAPIClient()
-        self._client.getObject("sim").loadScene("/home/kvadner/Desktop/AuE6930_F24_FinalProject/Scenes/QScene3.ttt")       
+        #self._client.getObject("sim").loadScene("/home/kvadner/Desktop/AuE6930_F24_FinalProject/Scenes/QScene3.ttt")       
         self._sim = self._client.require('sim')
         
         self._sim.setStepping(True)
@@ -253,13 +253,13 @@ class CoppeliaBridge:
 
         self._adjustDifferential()
     
-    def pathForOG(self, ogDim = (180,180)):
+    def pathForOG(self, ogDim = (180,180), maxDist=1.5):
         '''
         Return points in the occupancy grid that represent the path
         '''
         ogSizeX = ogDim[0]
         ogSizeY = ogDim[1]
-        MperPx = (ogSizeX/2)/1.5
+        MperPx = (ogSizeX/2)/maxDist
         pathError, orientError = self.getPathErrorPos()
         
         xPt = [pathError[0]]
@@ -280,7 +280,97 @@ class CoppeliaBridge:
         rr,cc = line(xPt[0], yPt[0], xPt[1], yPt[1])
         
         return rr,cc
+    
+    def pathPosLookAhead(self, LkAhd = 1.4, numPts = 5):
+        '''
+        Returns the path positions relative to the vehicle evenly spaced up to LkAhd meters ahead along the path
+        '''
+        xPt = []
+        yPt = []
+        #Get the path info of the current path
+        pathPos = self._pathPoints     
+        pathLen = self._pathLengths
         
+        lkAhdPts = np.linspace(0,LkAhd,numPts)
+        
+        pos, rot = self.getPose(self._front, self._lanes[0]) #Find the pose of the center of the front axle
+        posAlongPath = self._sim.getClosestPosOnPath(pathPos, pathLen, pos)
+        
+        for pt in lkAhdPts:
+            nextPos = posAlongPath+pt
+            #Compare to the final path position, wrap around if beyond that
+            if nextPos > self._totalLength:
+                nextPos = remainder(nextPos, self._totalLength)
+            pathPt = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos) #Convert the position along path to an XYZ position in the path's frame
+            pathError = np.subtract(pathPt, pos)
+            xPt.append(pathError[0])
+            yPt.append(pathError[1])
+
+        return xPt,yPt
+    
+    def pathOGLkAhdBz(self, ogDim = (180,180), maxDist=1.5):
+        '''
+        Returns path information on the occupancy grid in a series of bezier curves
+        '''        
+        ogSizeX = ogDim[0]
+        ogSizeY = ogDim[1]
+        MperPx = (ogSizeX/2)/maxDist
+        
+        numPts = 5
+        weight = 1
+        
+        img = np.zeros(ogDim, dtype=np.uint8)
+        xPt,yPt = self.pathPosLookAhead(LkAhd=maxDist,numPts=numPts)
+        __, orientErr = self.getPathErrorPos()
+        
+        for n in range(numPts):
+            xPt[n], yPt[n] = helper.rotatePoint(xPt[n], yPt[n], -1*orientErr)        
+        
+        #Cast to int and scale to pixel frame
+        xPt = [int((val*MperPx)+(ogSizeX/2)) for val in xPt]
+        yPt = [int((-1*val*MperPx)+(ogSizeY/2)) for val in yPt] #Negate Y due to occupancy grid more positive Y being behind the vehicle.
+
+        #Bound the points to the size of the occupancy grid
+        xPt = np.clip(xPt,0,ogSizeX-1)
+        yPt = np.clip(yPt,0,ogSizeY-1)
+        
+        for n in range(0,numPts-1,2):
+            rr,cc = bezier_curve(xPt[n],yPt[n],xPt[n+1],yPt[n+1],xPt[n+2],yPt[n+2],weight=weight,shape=ogDim)
+            img[cc,rr] = 2
+            
+        
+        return img
+    
+    def pathOGLkAhdLin(self, ogDim = (180,180), maxDist=1.5):
+        '''
+        Returns path information on the occupancy grid in a series of line segments
+        '''
+        ogSizeX = ogDim[0]
+        ogSizeY = ogDim[1]
+        MperPx = (ogSizeX/2)/maxDist
+        
+        numPts = 5
+        
+        img = np.zeros(ogDim, dtype=np.uint8)
+        xPt,yPt = self.pathPosLookAhead(LkAhd=maxDist,numPts=numPts)
+        __, orientErr = self.getPathErrorPos()
+
+        for n in range(numPts):
+            xPt[n], yPt[n] = helper.rotatePoint(xPt[n], yPt[n], -1*orientErr)                   
+        
+        #Cast to int and scale to pixel frame
+        xPt = [int((val*MperPx)+(ogSizeX/2)) for val in xPt]
+        yPt = [int((-1*val*MperPx)+(ogSizeY/2)) for val in yPt] #Negate Y due to occupancy grid more positive Y being behind the vehicle.
+    
+        #Bound the points to the size of the occupancy grid
+        xPt = np.clip(xPt,0,ogSizeX-1)
+        yPt = np.clip(yPt,0,ogSizeY-1)
+        
+        for n in range(0,numPts-1,1):
+            rr,cc = line(xPt[n],yPt[n],xPt[n+1],yPt[n+1])
+            img[cc,rr] = 2
+        
+        return img
     
     def getOccupancyGrid(self):  
         '''
@@ -321,8 +411,10 @@ class CoppeliaBridge:
         og[cc, rr] = 0
         
         #Add path information to the occupancy grid
-        rrP, ccP = self.pathForOG(np.shape(og))
-        og[ccP,rrP]+=2
+        #rrP, ccP = self.pathForOG(np.shape(og),maxDist)
+        #og[ccP,rrP]+=2
+        tempImg = self.pathOGLkAhdLin(np.shape(og),maxDist)
+        og+= tempImg
 
         if(self._plot):
             self._plotter.clear()                            
@@ -549,3 +641,9 @@ class helper:
     def pipi(a): 
         a = remainder(a, 2*pi)       
         return (2*pi - a) if a > pi else a
+
+    def rotatePoint(x,y,angle):
+        xprime = x*cos(angle)-y*sin(angle)
+        yprime = x*sin(angle)+y*cos(angle)
+        
+        return xprime,yprime
