@@ -1,13 +1,9 @@
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
 from ReinformentLearning.Environment import RLEnvironment, EpisodeConfig
-from ReinformentLearning.RLAgent import AgentConfig, VehicleAgent
-
-from typing import List
-import numpy as np
-import matplotlib.pyplot as plt
+from ReinformentLearning.RLAgent import DDPGAgent, DDPGConfig
 import time
 
-def train_agent(num_episodes: int = 100):
+def test_agent(model_path: str, num_episodes: int = 5):
     # Create environment
     bridge = CoppeliaBridge()
     config = EpisodeConfig(
@@ -18,97 +14,53 @@ def train_agent(num_episodes: int = 100):
     )
     env = RLEnvironment(bridge, config)
     
-    # Create agent
-    agent_config = AgentConfig()
-    agent = VehicleAgent(agent_config)
+    # Get sample state to verify dimensions
+    initial_state = env.reset()
+    _, vector_input = initial_state.get_network_inputs()
+    vector_dim = vector_input.shape[0]
     
-    # Training metrics
-    episode_rewards = []
-    episode_losses = []
-    mean_path_errors = []
+    # Create and load agent
+    agent_config = DDPGConfig(
+        state_dim=vector_dim,
+        action_dim=2,
+        hidden_dim=128,
+        action_bounds=((-0.5, 0.5), (0, 10))
+    )
+    agent = DDPGAgent(agent_config)
+    agent.load(model_path)
     
-    # Training loop
+    print(f"Starting testing of model: {model_path}")
     for episode in range(num_episodes):
-        state = env.reset(randomize=True)
+        state = env.reset(randomize=False)
         episode_reward = 0
-        episode_loss = 0
+        steps = 0
         
-        # Episode loop
+        print(f"\nStarting Test Episode {episode + 1}")
+        
         while True:
-            # Select and perform action
-            speed, steering, action_idx = agent.select_action(state)
-            next_state, reward, done, _ = env.step((speed, steering))
-            
-            # Store transition
-            agent.memory.push(
-                agent._preprocess_state(state).squeeze().cpu().numpy(),
-                action_idx,  # Store the discrete action index
-                reward,
-                agent._preprocess_state(next_state).squeeze().cpu().numpy(),
-                done
-            )
-            
-            # Train agent
-            loss = agent.train(agent_config.batch_size)
-            episode_loss += loss
+            action = agent.select_action(state, add_noise=False)
+            next_state, reward, done, info = env.step(action)
             episode_reward += reward
+            steps += 1
+            
+            if steps % 20 == 0:
+                print(f"Step {steps}")
+                print(f"  Acceleration: {action.acceleration:.2f} m/s²")
+                print(f"  Steering: {action.steering:.2f} rad")
+                print(f"  Path Error: {next_state.path_error[0]:.2f} m")
             
             if done:
                 break
-            
+                
             state = next_state
         
-        # Update target network periodically
-        if episode % agent_config.target_update == 0:
-            agent.update_target_network()
-        
-        # Update exploration rate
-        agent.update_epsilon()
-        
-        # Get episode statistics
         stats = env.get_episode_stats()
+        print(f"\nTest Episode {episode + 1} finished:")
+        print(f"  Steps: {steps}")
+        print(f"  Total Reward: {episode_reward:.2f}")
+        print(f"  Mean Path Error: {stats.mean_path_error:.2f}")
         
-        # Store metrics
-        episode_rewards.append(episode_reward)
-        episode_losses.append(episode_loss)
-        mean_path_errors.append(stats.mean_path_error)
-        
-        # Print progress
-        if (episode + 1) % 10 == 0:
-            print(f"Episode {episode + 1}")
-            print(f"  Reward: {episode_reward:.2f}")
-            print(f"  Mean Path Error: {stats.mean_path_error:.2f}")
-            print(f"  Epsilon: {agent.epsilon:.3f}")
-        
-        # Save model periodically
-        if (episode + 1) % 100 == 0:
-            agent.save(f"agent_checkpoint_{episode+1}.pt")
-    
-    # Plot training metrics
-    plt.figure(figsize=(15, 5))
-    
-    plt.subplot(131)
-    plt.plot(episode_rewards)
-    plt.title("Episode Rewards")
-    plt.xlabel("Episode")
-    plt.ylabel("Reward")
-    
-    plt.subplot(132)
-    plt.plot(episode_losses)
-    plt.title("Training Loss")
-    plt.xlabel("Episode")
-    plt.ylabel("Loss")
-    
-    plt.subplot(133)
-    plt.plot(mean_path_errors)
-    plt.title("Mean Path Error")
-    plt.xlabel("Episode")
-    plt.ylabel("Error")
-    
-    plt.tight_layout()
-    plt.show()
-    
-    return agent, env
+        time.sleep(1)
 
 if __name__ == "__main__":
-    agent, env = train_agent()
+    test_agent("agent_trained.pt")

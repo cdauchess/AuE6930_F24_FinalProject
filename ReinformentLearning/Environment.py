@@ -1,31 +1,13 @@
-from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
-from .Reward import RLReward
-
-import random
 from dataclasses import dataclass
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List, Optional, NamedTuple
 import numpy as np
 import time
+import random
 
-@dataclass
-class EpisodeConfig:
-    """Configuration for RL episodes"""
-    max_steps: int = 100
-    position_range: float = 1.0
-    orientation_range: float = 0.5
-    max_path_error: float = 5.0
-    time_step: float = 0.05
-    renderEnabled = True
-
-@dataclass
-class EpisodeStats:
-    """Statistics for an episode"""
-    episode_number: int
-    steps: int
-    total_reward: float
-    mean_path_error: float
-    max_path_error: float
-    success: bool
+from .Configs import EpisodeConfig, EpisodeStats
+from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
+from .VehicleHandler import VehicleState, VehicleAction
+from .RewardCalculator import RLReward
 
 class RLEnvironment:
     """RL Environment wrapper for CoppeliaBridge"""
@@ -39,32 +21,27 @@ class RLEnvironment:
         self.episode_reward = 0.0
         self.path_errors = []
         
-        # Store initial state
-        self._initial_position, self._initial_orientation  = self.bridge.getEgoPoseAbsolute() 
-        
-        #Reward Function Configuration
-        #TODO - pass maximum speed and lane width
-        self.rewardFunctions = RLReward()
+        # Initial pose - we'll get this once during initialization
+        self.initial_pose = self._get_initial_pose()
 
-    def reset(self, randomize: bool = True) -> Dict:
-        """
-        Reset environment and start new episode
-        Returns: Initial state dictionary
-        """
-        # Stop current simulation
-        self.bridge.stopSimulation()
         
-        # Wait a small amount of time to ensure proper cleanup
+        # Reward function
+        self.reward_function = RLReward()
+
+    def _get_initial_pose(self) -> Tuple[List[float], List[float]]:
+        """Get initial pose from bridge once during initialization"""
+        position, orientation = self.bridge.getEgoPoseAbsolute()
+        return position, orientation
+
+    def reset(self, randomize: bool = True) -> VehicleState:
+        """Reset environment and start new episode"""
+        # Stop and restart simulation
+        self.bridge.stopSimulation()
         time.sleep(0.5)
         
-        # Reset simulation settings
         self.bridge.setSimStepping(True)
-        
-        # Start new simulation
         self.bridge.startSimulation()
-        self.bridge.renderState(self.config.renderEnabled)
-        
-        # Wait for simulation to stabilize
+        self.bridge.renderState(self.config.render_enabled)
         time.sleep(0.5)
         
         # Reset episode tracking
@@ -73,100 +50,87 @@ class RLEnvironment:
         self.path_errors = []
         self.episode_count += 1
 
-        # Set initial state
+        # Set vehicle pose
         if randomize:
-            position = self._get_random_position()
-            orientation = self._get_random_orientation()
+            self._set_random_pose()
         else:
-            position = self._initial_position
-            orientation = self._initial_orientation
-            
-        # Set position and orientation
-        self.bridge.setVehiclePose(position, orientation)
+            self.bridge.setVehiclePose(self.initial_pose[0], self.initial_pose[1])
         
         # Reset vehicle controls
         self.bridge.resetVehicle()
-        
-        # Wait for physics to stabilize
         time.sleep(0.1)
         
-        # Return initial observation
-        return self._get_observation()
+        # Return initial state
+        return VehicleState.from_bridge(self.bridge)
 
-    def step(self, action: Tuple[float, float]) -> Tuple[Dict, float, bool, Dict]:
-        """
-        Execute action and return (state, reward, done, info)
-        Args:
-            action: Tuple of (speed, steering)
-        """
+    def step(self, action: VehicleAction) -> Tuple[VehicleState, float, bool, Dict]:
+        """Execute action and return new state, reward, done flag, and info"""
         # Apply action
-        speed, steering = action
-        self.bridge.setVehicleSpeed(speed)
-        self.bridge.setSteering(steering)
+        self.bridge.setVehicleSpeed(action.acceleration)
+        self.bridge.setSteering(action.steering)
         
         # Step simulation
         self.bridge.stepTime()
         self.current_step += 1
         
-        # Get new state and calculate reward
-        self.og = self.bridge.getOccupancyGrid()
-        new_state = self._get_observation()
-        reward = self._calculate_reward(new_state)
-        self.episode_reward += reward
+        # Get new state
+        new_state = VehicleState.from_bridge(self.bridge)
         
-        # Check if episode is done
+        # Calculate reward using reward function
+        reward = self.reward_function.calculate_reward({
+            'speed': new_state.speed,
+            'path_error': new_state.path_error[0],  # Using lateral error
+            'orientation_error': new_state.path_error[1], # heading_error
+            'steering': new_state.steering,
+            'collision': self.bridge.checkEgoCollide(new_state.occupancy_grid),
+            'success': self._success(new_state)
+        })
+        
+        self.episode_reward += reward
+        self.path_errors.append(new_state.path_error[0])
+        
+        # Check termination
         done = self._is_done(new_state)
         
-        # Get additional info
+        # Additional info
         info = {
             'episode': self.episode_count,
             'step': self.current_step,
-            'path_error': new_state['path_error']
+            'path_error': new_state.path_error[0]
         }
         
         return new_state, reward, done, info
 
-    def _get_observation(self) -> Dict:
-        """Get current state observation"""
-        vehicle_state = self.bridge.getVehicleState()
-        path_error, orient_error = self.bridge.getPathError()
-        
-        # Store path error for statistics
-        self.path_errors.append(path_error)
-        
-        return {
-            'position': vehicle_state['Position'],
-            'orientation': vehicle_state['Orientation'],
-            'speed': vehicle_state['Speed'],
-            'steering': vehicle_state['Steering'],
-            'path_error': path_error,
-            'orient_error': orient_error
-            # TODO: Add Object distance/ position / spread (Perception Information)
-        }
-
-    def _calculate_reward(self, state: Dict) -> float:
-        """Calculate reward for current state"""
-        '''
-        path_error = state['path_error']
-        steering = state['steering']
-        
-        # Calculate different reward components
-        distance_error = np.linalg.norm(path_error)
-        path_reward = -distance_error
-        steering_penalty = -0.1 * abs(steering/self.bridge._maxSteerAngle)
-        '''
-        
-        return self.rewardFunctions.calcReward(state)
-
-    def _is_done(self, state: Dict) -> bool:
+    def _success(self, state: VehicleState) -> bool:
+        """Episode succeeds if path completed within error bounds"""
+        return (
+            self.current_step >= self.config.max_steps and
+            abs(state.path_error[0]) < self.config.max_path_error * 0.5
+        )
+    
+    def _is_done(self, state: VehicleState) -> bool:
         """Check if episode should terminate"""
-        # Check termination conditions
-        max_steps_reached = self.current_step >= self.config.max_steps
-        path_error = state['path_error']
-        off_track = path_error > self.config.max_path_error
-        collided = self.bridge.checkEgoCollide(self.og)
+        return (
+            self.current_step >= self.config.max_steps or
+            abs(state.path_error[0]) > self.config.max_path_error or
+            self.bridge.checkEgoCollide(state.occupancy_grid)
+        )
+
+    def _set_random_pose(self):
+        """Set random initial pose within configured ranges"""
+        position = [
+            self.initial_pose[0][0] + random.uniform(-self.config.position_range, self.config.position_range),
+            self.initial_pose[0][1] + random.uniform(-self.config.position_range, self.config.position_range),
+            self.initial_pose[0][2]  # Keep Z constant
+        ]
         
-        return max_steps_reached or off_track or collided
+        orientation = [
+            self.initial_pose[1][0],
+            self.initial_pose[1][1],
+            self.initial_pose[1][2] + random.uniform(-self.config.orientation_range, self.config.orientation_range)
+        ]
+        
+        self.bridge.setVehiclePose(position, orientation)
 
     def get_episode_stats(self) -> EpisodeStats:
         """Get statistics for current episode"""
@@ -178,23 +142,3 @@ class RLEnvironment:
             max_path_error=np.max(self.path_errors),
             success=self.current_step >= self.config.max_steps
         )
-
-    def _get_random_position(self) -> List[float]:   
-        """Generate random initial position"""
-        return [
-            self._initial_position[0] + random.uniform(
-                -self.config.position_range, self.config.position_range),
-            self._initial_position[1] + random.uniform(
-                -self.config.position_range, self.config.position_range),
-            self._initial_position[2]  # Keep Z constant
-        ]
-        # TODO: Set the random position to be within the path 
-        
-    def _get_random_orientation(self) -> List[float]:
-        """Generate random initial orientation"""
-        return [
-            self._initial_orientation[0],
-            self._initial_orientation[1],
-            self._initial_orientation[2] + random.uniform(
-                -self.config.orientation_range, self.config.orientation_range)
-        ]

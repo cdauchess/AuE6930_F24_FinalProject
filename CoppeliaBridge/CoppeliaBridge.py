@@ -1,6 +1,8 @@
 #  python -m pip install coppeliasim-zmqremoteapi-client
 #  python -m pip install scikit-learn
 #  python -m pip install -U scikit-image
+#  python -m pip install scikit-learn
+#  python -m pip install -U scikit-image
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,7 +19,8 @@ class CoppeliaBridge:
         self._isRunning = False
         self._isEgoReady = False
         
-        self._client = RemoteAPIClient()        
+        self._client = RemoteAPIClient()
+        self._client.getObject("sim").loadScene("/home/kvadner/Desktop/AuE6930_F24_FinalProject/Scenes/QScene3.ttt")       
         self._sim = self._client.require('sim')
         
         self._sim.setStepping(True)
@@ -102,7 +105,7 @@ class CoppeliaBridge:
         self.switchLane(0)        
 
     # Section: Application behavior
-    def startSimulation(self, renderEnable = True):
+    def startSimulation(self, renderEnable = False):
         '''
         Starts CoppeliaSim simulator
         '''
@@ -207,7 +210,8 @@ class CoppeliaBridge:
         False = rendering disabled
         True = rendering enabled
         '''
-        self._sim.setBoolParam(self._sim.boolparam_display_enabled, render)
+        #self._sim.setBoolParam(self._sim.boolparam_display_enabled, render)
+        pass
 
     # Section: Vehicle behavior     
     def getSteeringAngle(self):
