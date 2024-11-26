@@ -253,13 +253,13 @@ class CoppeliaBridge:
 
         self._adjustDifferential()
     
-    def pathForOG(self, ogDim = (180,180)):
+    def pathForOG(self, ogDim = (180,180), maxDist=1.5):
         '''
         Return points in the occupancy grid that represent the path
         '''
         ogSizeX = ogDim[0]
         ogSizeY = ogDim[1]
-        MperPx = (ogSizeX/2)/1.5
+        MperPx = (ogSizeX/2)/maxDist
         pathError, orientError = self.getPathErrorPos()
         
         xPt = [pathError[0]]
@@ -308,16 +308,19 @@ class CoppeliaBridge:
 
         return xPt,yPt
     
-    def pathOGLkAhdBz(self, ogDim = (180,180)):
+    def pathOGLkAhdBz(self, ogDim = (180,180), maxDist=1.5):
+        '''
+        Returns path information on the occupancy grid in a series of bezier curves
+        '''        
         ogSizeX = ogDim[0]
         ogSizeY = ogDim[1]
-        MperPx = (ogSizeX/2)/1.5
+        MperPx = (ogSizeX/2)/maxDist
         
         numPts = 5
         weight = 1
         
         img = np.zeros(ogDim, dtype=np.uint8)
-        xPt,yPt = self.pathPosLookAhead(numPts=numPts)
+        xPt,yPt = self.pathPosLookAhead(LkAhd=maxDist,numPts=numPts)
         __, orientErr = self.getPathErrorPos()
         
         for n in range(numPts):
@@ -338,15 +341,18 @@ class CoppeliaBridge:
         
         return img
     
-    def pathOGLkAhdLin(self, ogDim = (180,180)):
+    def pathOGLkAhdLin(self, ogDim = (180,180), maxDist=1.5):
+        '''
+        Returns path information on the occupancy grid in a series of line segments
+        '''
         ogSizeX = ogDim[0]
         ogSizeY = ogDim[1]
-        MperPx = (ogSizeX/2)/1.5
+        MperPx = (ogSizeX/2)/maxDist
         
         numPts = 5
         
         img = np.zeros(ogDim, dtype=np.uint8)
-        xPt,yPt = self.pathPosLookAhead(numPts=numPts)
+        xPt,yPt = self.pathPosLookAhead(LkAhd=maxDist,numPts=numPts)
         __, orientErr = self.getPathErrorPos()
 
         for n in range(numPts):
@@ -405,9 +411,9 @@ class CoppeliaBridge:
         og[cc, rr] = 0
         
         #Add path information to the occupancy grid
-        #rrP, ccP = self.pathForOG(np.shape(og))
+        #rrP, ccP = self.pathForOG(np.shape(og),maxDist)
         #og[ccP,rrP]+=2
-        tempImg = self.pathOGLkAhdLin(np.shape(og))
+        tempImg = self.pathOGLkAhdLin(np.shape(og),maxDist)
         og+= tempImg
 
         if(self._plot):
