@@ -34,8 +34,8 @@ class RewardConfig:
     steering_weight: float = 0.5
     
     # Penalties and bonuses
-    collision_penalty: float = -10.0
-    zero_speed_penalty: float = -10.0
+    collision_penalty: float = -1.0
+    zero_speed_penalty: float = -1.0
     max_path_error_penalty: float = -1.0
     success_reward: float = 1.0
 

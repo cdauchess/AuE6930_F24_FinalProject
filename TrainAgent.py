@@ -1,4 +1,5 @@
-from .ReinformentLearning.Configs import EpisodeConfig, DDPGConfig
+
+from ReinformentLearning.Configs import EpisodeConfig, DDPGConfig
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
 from ReinformentLearning.Environment import RLEnvironment
 from ReinformentLearning.RLAgent import DDPGAgent
@@ -55,13 +56,13 @@ def train_agent(num_episodes: int = 100):
     agent_config = DDPGConfig(
         state_dim=vector_dim,
         action_dim=2,
-        hidden_dim=128,
+        hidden_dim=256,
         actor_lr=0.001,
         critic_lr=0.001,
         gamma=0.99,
         noise_std=0.1,
-        buffer_size=1000,
-        batch_size=64,
+        buffer_size=100000,
+        batch_size=128,
         action_bounds=((-0.5, 0.5), (0, 10))
     )
     agent = DDPGAgent(agent_config)
@@ -73,7 +74,7 @@ def train_agent(num_episodes: int = 100):
     
     print("Starting training...")
     for episode in range(num_episodes):
-        state = env.reset(randomize=True)
+        state = env.reset(randomize=False)
         episode_reward = 0
         actor_loss = critic_loss = 0
         
@@ -111,4 +112,4 @@ def train_agent(num_episodes: int = 100):
     print("Training completed. Model saved as 'agent_trained.pt'")
 
 if __name__ == "__main__":
-    train_agent(num_episodes=100)
+    train_agent(num_episodes=300)

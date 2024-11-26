@@ -3,6 +3,30 @@ from .Configs import RewardConfig
 from typing import Dict, Callable, List, Optional
 import numpy as np
 
+'''
+
+from dataclasses import dataclass
+@dataclass
+class RewardConfig:
+    """Configuration for reward calculation"""
+    # Vehicle limits
+    max_speed: float = 10.0      # m/s
+    max_path_error: float = 5.0  # meters
+    max_steering: float = 0.5    # radians
+    
+    # Component weights
+    speed_weight: float = 1.0
+    path_error_weight: float = 1.0
+    steering_weight: float = 0.5
+    
+    # Penalties and bonuses
+    collision_penalty: float = -1.0
+    zero_speed_penalty: float = -1.0
+    max_path_error_penalty: float = -1.0
+    success_reward: float = 1.0
+
+'''
+
 class RLReward:
     """Reinforcement Learning reward calculator with multiple reward functions"""
     
@@ -17,7 +41,7 @@ class RLReward:
         }
         
         # Default reward function
-        self.active_function = 'standard'
+        self.active_function = 'simple'
     
     def set_reward_function(self, function_name: str) -> bool:
         """
@@ -43,8 +67,8 @@ class RLReward:
         """Calculate speed component of reward"""
         if speed <= 0:
             return self.config.zero_speed_penalty
-        return self.config.speed_weight * (speed / self.config.max_speed)
-    
+        return self.config.speed_weight * (speed / self.config.max_speed) ** 2
+        
     def _path_error_reward(self, error: float) -> float:
         """Calculate path error component of reward using smooth function"""
         normalized_error = abs(error)
@@ -52,7 +76,7 @@ class RLReward:
             return self.config.max_path_error_penalty
         
         # Smooth exponential decay
-        reward = (np.exp(-1.0 * normalized_error) - 1) * -self.config.max_path_error_penalty
+        reward = (np.exp(-1.0 * normalized_error)) * -self.config.max_path_error_penalty
         return self.config.path_error_weight * reward
     
     def _orientation_reward(self, orientation: float) -> float:
@@ -65,19 +89,29 @@ class RLReward:
     
     def _simple_reward(self, state: Dict) -> float:
         """
-        Simplified reward function focusing mainly on path following
+        Simplified reward function focusing mainly on path following and moving forward.
         """
-        reward = self._path_error_reward(state['path_error'])
+        reward = 0.0
         
+        # Core components
+        reward += self._speed_reward(state['speed'])
+        reward += self._path_error_reward(state['path_error'])
+        
+        # Penalties and bonuses
         if state['collision']:
             reward += self.config.collision_penalty
+        
+        if state['success']:
+            reward += self.config.success_reward
             
         return reward
 
     def _standard_reward(self, state: Dict) -> float:
         """
-        Standard reward function combining speed, and path following
+        Standard reward function combining speed, and path following, steering, and orientation
         """
+        #TODO: Update with steer and orient.
+
         reward = 0.0
         
         # Core components
@@ -128,12 +162,14 @@ if __name__ == "__main__":
     
     # Plot path error reward function
     errors = np.linspace(-5, 5, 200)
+    #errors = np.linspace(0, 10, 200)
     rewards = [reward_calc._path_error_reward(error) for error in errors]
+    #rewards = [reward_calc._speed_reward(error) for error in errors]
     
     plt.figure(figsize=(10, 6))
     plt.plot(errors, rewards)
     plt.title('Path Error Reward Function')
-    plt.xlabel('Path Error (m)')
+    plt.xlabel('Path Error (m/s)')
     plt.ylabel('Reward')
     plt.grid(True)
     plt.show()
