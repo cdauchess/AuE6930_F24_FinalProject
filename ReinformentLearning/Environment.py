@@ -40,7 +40,7 @@ class RLEnvironment:
         time.sleep(0.5)
         
         self.bridge.setSimStepping(True)
-        self.bridge.startSimulation()
+        self.bridge.startSimulation(True)
         self.bridge.renderState(self.config.render_enabled)
         time.sleep(0.5)
         

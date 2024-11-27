@@ -34,6 +34,8 @@ class DDPGAgent:
     def __init__(self, config: DDPGConfig):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(self.device)
+        torch.serialization.add_safe_globals([DDPGConfig])
         
         # Actor Networks
         self.actor = ActorNetwork(

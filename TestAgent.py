@@ -23,7 +23,7 @@ def test_agent(model_path: str, num_episodes: int = 5):
     agent_config = DDPGConfig(
         state_dim=vector_dim,
         action_dim=2,
-        hidden_dim=128,
+        hidden_dim=256,
         action_bounds=((-0.5, 0.5), (0, 10))
     )
     agent = DDPGAgent(agent_config)
