@@ -31,7 +31,7 @@ def test_agent(model_path: str, num_episodes: int = 5):
     
     print(f"Starting testing of model: {model_path}")
     for episode in range(num_episodes):
-        state = env.reset(randomize=False)
+        state = env.reset(randomize=True)
         episode_reward = 0
         steps = 0
         
@@ -63,4 +63,4 @@ def test_agent(model_path: str, num_episodes: int = 5):
         time.sleep(1)
 
 if __name__ == "__main__":
-    test_agent("agent_trained.pt")
+    test_agent("agent_trained01.pt")

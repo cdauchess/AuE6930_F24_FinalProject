@@ -35,7 +35,7 @@ def plot_training_metrics(rewards: List[float], losses: List[float], errors: Lis
     plt.savefig('training_metrics.png')
     plt.close()
 
-def train_agent(num_episodes: int = 300):
+def train_agent(num_episodes: int = 500):
     # Create environment
     bridge = CoppeliaBridge()
     config = EpisodeConfig(
@@ -74,7 +74,7 @@ def train_agent(num_episodes: int = 300):
     
     print("Starting training...")
     for episode in range(num_episodes):
-        state = env.reset(randomize=False)
+        state = env.reset(randomize=True)
         episode_reward = 0
         actor_loss = critic_loss = 0
         

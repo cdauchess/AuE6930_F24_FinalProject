@@ -1,0 +1,2 @@
+Training Log
+agent_trained01.pt - 300 episodes, same starting position on the large track. Model follows track well but drives slow

@@ -52,7 +52,8 @@ class RLEnvironment:
 
         # Set vehicle pose
         if randomize:
-            self._set_random_pose()
+            self.bridge.setInitPosition(startPos=np.random.rand())
+            #self._set_random_pose()
         else:
             self.bridge.setVehiclePose(self.initial_pose[0], self.initial_pose[1])
         
