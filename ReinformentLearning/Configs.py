@@ -5,8 +5,8 @@ class EpisodeConfig:
     """Configuration for RL episodes"""
     max_steps: int = 800  # Increased from 200
     position_range: float = 1.0
-    orientation_range: float = 0.5
-    max_path_error: float = 5.0
+    orientation_range: float = 0.2
+    max_path_error: float = 1.0
     time_step: float = 0.05
     render_enabled: bool = True
 
@@ -25,7 +25,7 @@ class RewardConfig:
     """Configuration for reward calculation"""
     # Vehicle limits
     max_speed: float = 3.0
-    max_path_error: float = 5.0
+    max_path_error: float = 1.0
     max_steering: float = 0.5
     
     # Component weights
@@ -36,7 +36,7 @@ class RewardConfig:
     # Penalties and bonuses
     collision_penalty: float = -2.0  # Increased penalty
     zero_speed_penalty: float = -1.0
-    max_path_error_penalty: float = -1.5
+    max_path_error_penalty: float = -2.0
     success_reward: float = 2.0  # Increased reward for completing longer episodes
 
 @dataclass

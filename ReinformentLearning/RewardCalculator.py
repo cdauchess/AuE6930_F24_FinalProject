@@ -10,9 +10,9 @@ from dataclasses import dataclass
 class RewardConfig:
     """Configuration for reward calculation"""
     # Vehicle limits
-    max_speed: float = 3.0      # m/s
-    max_path_error: float = 5.0  # meters
-    max_steering: float = 0.5    # radians
+    max_speed: float = 3.0
+    max_path_error: float = 1.0
+    max_steering: float = 0.5
     
     # Component weights
     speed_weight: float = 1.0
@@ -20,10 +20,10 @@ class RewardConfig:
     steering_weight: float = 1.0
     
     # Penalties and bonuses
-    collision_penalty: float = -1.0
+    collision_penalty: float = -2.0  # Increased penalty
     zero_speed_penalty: float = -1.0
-    max_path_error_penalty: float = -1.0
-    success_reward: float = 1.0
+    max_path_error_penalty: float = -2.0
+    success_reward: float = 2.0  # Increased reward for completing longer episodes
 
 '''
 
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
     
     # 1. Path Error Reward
-    errors = np.linspace(-5, 5, 200)
+    errors = np.linspace(-reward_calc.config.max_path_error, reward_calc.config.max_path_error, 200)
     path_rewards = [reward_calc._path_error_reward(error) for error in errors]
     ax1.plot(errors, path_rewards)
     ax1.set_title('Path Error Reward')
