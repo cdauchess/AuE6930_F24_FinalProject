@@ -3,11 +3,11 @@ from ReinformentLearning.Environment import RLEnvironment, EpisodeConfig
 from ReinformentLearning.RLAgent import DDPGAgent, DDPGConfig
 import time
 
-def test_agent(model_path: str, num_episodes: int = 5):
+def test_agent(model_path: str, num_episodes: int = 3):
     # Create environment
     bridge = CoppeliaBridge()
     config = EpisodeConfig(
-        max_steps=200,
+        max_steps=1000,
         position_range=1.0,
         orientation_range=0.5,
         max_path_error=1.0
@@ -38,7 +38,7 @@ def test_agent(model_path: str, num_episodes: int = 5):
         print(f"\nStarting Test Episode {episode + 1}")
         
         while True:
-            action = agent.select_action(state, add_noise=False)
+            action = agent.select_action(state, add_noise=False) 
             next_state, reward, done, info = env.step(action)
             episode_reward += reward
             steps += 1
@@ -63,4 +63,4 @@ def test_agent(model_path: str, num_episodes: int = 5):
         time.sleep(1)
 
 if __name__ == "__main__":
-    test_agent("agent_trained01.pt")
+    test_agent("agent_trained03.pt")

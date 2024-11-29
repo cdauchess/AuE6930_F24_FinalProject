@@ -35,16 +35,11 @@ def plot_training_metrics(rewards: List[float], losses: List[float], errors: Lis
     plt.savefig('training_metrics.png')
     plt.close()
 
-def train_agent(num_episodes: int = 300):
+def train_agent(num_episodes: int = 10):
     # Create environment
     bridge = CoppeliaBridge()
-    config = EpisodeConfig(
-        max_steps=200,
-        position_range=1.0,
-        orientation_range=0.5,
-        max_path_error=1.0,
-        render_enabled=False
-    )
+    config = EpisodeConfig()
+    
     env = RLEnvironment(bridge, config)
     
     # Get a sample state to verify dimensions
@@ -53,18 +48,8 @@ def train_agent(num_episodes: int = 300):
     vector_dim = vector_input.shape[0]
     
     # Create agent
-    agent_config = DDPGConfig(
-        state_dim=vector_dim,
-        action_dim=2,
-        hidden_dim=256,
-        actor_lr=0.001,
-        critic_lr=0.001,
-        gamma=0.99,
-        noise_std=0.1,
-        buffer_size=100000,
-        batch_size=128,
-        action_bounds=((-0.5, 0.5), (0, 1.5))
-    )
+    agent_config = DDPGConfig(state_dim = vector_dim)
+    
     agent = DDPGAgent(agent_config)
     
     # Training metrics
@@ -112,4 +97,4 @@ def train_agent(num_episodes: int = 300):
     print("Training completed. Model saved as 'agent_trained.pt'")
 
 if __name__ == "__main__":
-    train_agent(num_episodes=400)
+    train_agent(num_episodes=1000)
