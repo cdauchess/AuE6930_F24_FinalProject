@@ -91,7 +91,8 @@ class CoppeliaBridge:
                 break            
 
         self._laneCount = len(self._lanes)
-        self.switchLane(0)      
+        self.switchLane(0)  
+        self.getObstacleInfo(9,0)    
 
     # Section: Application behavior
     def startSimulation(self, renderEnable = False):
@@ -139,6 +140,46 @@ class CoppeliaBridge:
         
         return pathPositions, pathQuaternions, pathLengths    
     
+    #Find the nearest points along the path for each obstacle
+    def getObstacleInfo(self,numObstacles = 9, pathNum = 0):
+        
+        self._obsPosPath = []
+        pathPos = self._pathPoints     
+        pathLen = self._pathLengths
+        
+        for i in range(numObstacles):
+            obsHandle = self._sim.getObject("/Obs[" + str(i)+"]", {'noError' : True})
+            if obsHandle >= 0:
+                obsPos = self._sim.getObjectPosition(obsHandle, self._lanes[pathNum])
+                self._obsPosPath.append(self._sim.getClosestPosOnPath(pathPos, pathLen, obsPos))
+            else: 
+                break
+            
+            
+    def checkInitPosition(self,initPos, obsRad = 0.5, offset = 0.5):
+        
+        for i in range(len(self._obsPosPath)):
+            #Check to make sure that we don't look beyond the end of the path
+            if self._obsPosPath[i]+obsRad > self._totalLength:
+                farPos = remainder(self._obsPosPath[i]+obsRad, self._totalLength)
+            else:
+                farPos = self._obsPosPath[i]+obsRad
+                
+            #Check to make sure the look backwards is positive 
+            if self._obsPosPath[i]-obsRad < 0:
+                backPos = self._totalLength + (self._obsPosPath[i]-obsRad)
+            else:
+                backPos = self._obsPosPath[i] - obsRad
+            
+            if initPos < farPos and initPos > backPos: #Position is in the obstacle
+                initPos = self._obsPosPath[i] + obsRad + offset #Place the vehicle beyond the obstacle
+
+            #Check to make sure the chosen position isn't beyond total path length. If beyond, wrap around due to closed loop
+            if initPos > self._totalLength:
+                initPos = remainder(initPos, self._totalLength)
+        
+        return initPos
+        
     def setInitPosition(self,pathNum=0,startPos=0):
         '''
         Sets the vehicles position to a position along the selected path
@@ -154,6 +195,8 @@ class CoppeliaBridge:
         
         #Map starting position to valid values
         startPathPos = startPos*max(pathLen)
+        #Check to make sure position isn't in an obstacle
+        startPathPos = self.checkInitPosition(startPathPos)
         
         startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos) # Convert the position along path to an XYZ position in the path's frame
         startPoint[2] = startPoint[2] +.2 #Offset in Z to keep vehicle above ground plane.
