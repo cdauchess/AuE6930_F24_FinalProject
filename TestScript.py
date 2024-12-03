@@ -9,7 +9,7 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint, renderEnable):
     #bridge.initScene()
     #bridge.initEgo()
     bridge.startSimulation()
-    bridge.setVehicleSpeed(0.5)
+    
     bridge.setInitPosition(0,startPoint)
 
     curTime = 0
@@ -17,6 +17,7 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint, renderEnable):
     orientError = []
     while bridge._isRunning and (curTime<duration):
         bridge.stepTime()
+        bridge.setMotion(1)
         curTime = bridge.getTime()
         #print(curTime)
         pathErrorT,orientErrorT = bridge.getPathErrorPos()
@@ -29,9 +30,10 @@ def runSim(bridge: CoppeliaBridge, duration, startPoint, renderEnable):
             bridge.setSteering(-0.2)
             
         og = bridge.getOccupancyGrid()
-        print(bridge.checkEgoCollide(og))
+        #print(bridge.checkEgoCollide(og))
         pathError.append(pathErrorT)
         orientError.append(orientErrorT)
+        #print(bridge.getVehicleSpeed())
 
     print("Time Elapsed!")
     bridge.stopSimulation()
