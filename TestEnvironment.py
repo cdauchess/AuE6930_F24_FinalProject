@@ -27,14 +27,14 @@ def test_rl_environment():
         # Reset environment
         state = env.reset(randomize=True)
         print("Reset complete.")
-        print(f"Initial state: {state}")
+        #print(f"Initial state: {state}")
         print(f"Simulation running: {bridge.isRunning()}")
         
         # Run episode
         done = False
         while not done:
             # Simple test policy
-            action = VehicleAction(steering=0.2 * np.sin(env.current_step * 0.1), acceleration=1)
+            action = VehicleAction(steering=-0.2 * np.sin(env.current_step * 0.1), acceleration=1)
             
             
             # Step environment

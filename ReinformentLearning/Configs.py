@@ -5,7 +5,7 @@ class EpisodeConfig:
     """Configuration for RL episodes"""
     max_steps: int = 800  # Increased from 200
     position_range: float = 1.0
-    orientation_range: float = 0.2
+    orientation_range: float = 0.1
     max_path_error: float = 1.0
     time_step: float = 0.05
     render_enabled: bool = True
@@ -34,10 +34,10 @@ class RewardConfig:
     steering_weight: float = 1.0
     
     # Penalties and bonuses
-    collision_penalty: float = -2.0  # Increased penalty
+    collision_penalty: float = -5.0  # Increased penalty
     zero_speed_penalty: float = -1.0
     max_path_error_penalty: float = -2.0
-    success_reward: float = 2.0  # Increased reward for completing longer episodes
+    success_reward: float = 5.0  # Increased reward for completing longer episodes
 
 @dataclass
 class DDPGConfig:
@@ -45,11 +45,11 @@ class DDPGConfig:
     state_dim: int = 5
     action_dim: int = 2  # [steering, speed]
     hidden_dim: int = 256
-    actor_lr: float = 0.001
-    critic_lr: float = 0.001
+    actor_lr: float = 0.01
+    critic_lr: float = 0.01
     gamma: float = 0.99
     tau: float = 0.001  # For soft target updates
     noise_std: float = 0.1
-    buffer_size: int = 100000
+    buffer_size: int = 10000
     batch_size: int = 128
-    action_bounds: tuple = ((-0.5, 0.5), (0, 3.0))  # ((steering_min, steering_max), (speed_min, speed_max))
+    action_bounds: tuple = ((-0.5, 0.5), (0, 1))  # ((steering_min, steering_max), (speed_min, speed_max))

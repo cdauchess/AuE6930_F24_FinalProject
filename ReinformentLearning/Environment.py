@@ -66,8 +66,9 @@ class RLEnvironment:
 
     def step(self, action: VehicleAction) -> Tuple[VehicleState, float, bool, Dict]:
         """Execute action and return new state, reward, done flag, and info"""
+        
         # Apply action
-        self.bridge.setVehicleSpeed(action.acceleration)
+        self.bridge.setMotion(action.acceleration)
         self.bridge.setSteering(action.steering)
         
         # Step simulation

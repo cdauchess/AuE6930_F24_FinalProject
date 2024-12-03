@@ -24,7 +24,7 @@ def test_agent(model_path: str, num_episodes: int = 3):
         state_dim=vector_dim,
         action_dim=2,
         hidden_dim=256,
-        action_bounds=((-0.5, 0.5), (0, 10))
+        action_bounds=((-0.5, 0.5), (0, 1))
     )
     agent = DDPGAgent(agent_config)
     agent.load(model_path)
@@ -63,4 +63,4 @@ def test_agent(model_path: str, num_episodes: int = 3):
         time.sleep(1)
 
 if __name__ == "__main__":
-    test_agent("agent_trained03.pt")
+    test_agent("agent_trained.pt")

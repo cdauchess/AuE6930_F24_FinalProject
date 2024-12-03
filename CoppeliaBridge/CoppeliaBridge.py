@@ -20,7 +20,7 @@ class CoppeliaBridge:
         self._isEgoReady = False
         
         self._client = RemoteAPIClient()
-        #self._client.getObject("sim").loadScene("/home/kvadner/Desktop/AuE6930_F24_FinalProject/Scenes/QScene3.ttt")       
+        self._client.getObject("sim").loadScene("/home/kvadner/Desktop/AuE6930_F24_FinalProject/Scenes/QScene5.ttt")       
         self._sim = self._client.require('sim')
         
         self._sim.setStepping(True)
@@ -30,24 +30,13 @@ class CoppeliaBridge:
 
         self._plot = False
 
-        if self._plot:
-            self._fig = plt.figure()
-            self._plotter = self._fig.add_subplot(121)
-            self._img     = self._fig.add_subplot(122)
-            # self._img.invert_yaxis()
-
-            self._plotter.set_xlim(-1.5, 1.5)
-            self._plotter.set_ylim(-1.5, 1.5)     
-
-            # self._img.set_xlim(0, 360)
-            # self._img.set_ylim(0, 360)
         self.initEgo()
         self.initScene()
         
     def initEgo(self):
         # Motion Constraints
-        self._V_MAX = 3                 # max speed [m/s]
-        self._ACC_MAX = 5               # max acceleration [m/s2]
+        self._V_MAX = 1.5                 # max speed [m/s]
+        self._ACC_MAX = 3               # max acceleration [m/s2]
         self._D_MAX = radians(26)       # max steering angle
         
         # Sensor Constants
@@ -102,7 +91,7 @@ class CoppeliaBridge:
                 break            
 
         self._laneCount = len(self._lanes)
-        self.switchLane(0)        
+        self.switchLane(0)      
 
     # Section: Application behavior
     def startSimulation(self, renderEnable = False):
@@ -166,7 +155,7 @@ class CoppeliaBridge:
         #Map starting position to valid values
         startPathPos = startPos*max(pathLen)
         
-        startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos)#Convert the position along path to an XYZ position in the path's frame
+        startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos) # Convert the position along path to an XYZ position in the path's frame
         startPoint[2] = startPoint[2] +.2 #Offset in Z to keep vehicle above ground plane.
 
         
@@ -251,7 +240,7 @@ class CoppeliaBridge:
         self._sim.setJointTargetPosition(self._lSteerAxis, dl)
         self._sim.setJointTargetPosition(self._rSteerAxis, dr)        
 
-        self._adjustDifferential()
+        self._adjustDifferential() # what are the steering bounds?
     
     def pathForOG(self, ogDim = (180,180), maxDist=1.5):
         '''
@@ -291,7 +280,7 @@ class CoppeliaBridge:
         pathPos = self._pathPoints     
         pathLen = self._pathLengths
         
-        lkAhdPts = np.linspace(0,LkAhd,numPts)
+        lkAhdPts = np.linspace(-LkAhd,LkAhd,numPts)
         
         pos, rot = self.getPose(self._front, self._lanes[0]) #Find the pose of the center of the front axle
         posAlongPath = self._sim.getClosestPosOnPath(pathPos, pathLen, pos)
@@ -356,7 +345,7 @@ class CoppeliaBridge:
         __, orientErr = self.getPathErrorPos()
 
         for n in range(numPts):
-            xPt[n], yPt[n] = helper.rotatePoint(xPt[n], yPt[n], -1*orientErr)                   
+            xPt[n], yPt[n] = helper.rotatePoint(xPt[n], yPt[n], -orientErr + np.pi/2)                   
         
         #Cast to int and scale to pixel frame
         xPt = [int((val*MperPx)+(ogSizeX/2)) for val in xPt]
@@ -372,7 +361,7 @@ class CoppeliaBridge:
         
         return img
     
-    def getOccupancyGrid(self):  
+    def getOccupancyGridOld(self):  
         '''
         Returns a matrix of 0s and 1s. 1s indicate obstacles. 0s indicate free space
         2 indicates path position
@@ -463,8 +452,120 @@ class CoppeliaBridge:
         self.setVehicleSpeed(0)
         self.setSteering(0)
 
-    def checkEgoCollide(self):
-        pass
+    def getOccupancyGrid(self):  
+        '''
+        Returns a multi-channel occupancy grid with shape (channels, H, W)
+        Channel 0: Binary obstacles (0: free, 1: occupied)
+        Channel 1: Distance to obstacles
+        Channel 2: Path information
+        Channel 3: Distance to path
+        '''      
+        maxDist = 1.5
+        
+        # Get sensor data
+        rawDataL, resL = self._sim.getVisionSensorDepth(self._leftSensor, 1)
+        rawDataF, resF = self._sim.getVisionSensorDepth(self._frontSensor, 1)
+        rawDataR, resR = self._sim.getVisionSensorDepth(self._rightSensor, 1)
+        rawDataB, resB = self._sim.getVisionSensorDepth(self._rearSensor, 1)
+        
+        divs = np.arange(-maxDist, maxDist, 2*maxDist/resL[0]) / maxDist
+
+        # 2 rows of data                
+        xL = -np.reshape(self._sim.unpackFloatTable(rawDataL), [resL[1], -1])
+        yL = -xL * divs
+        
+        yF = np.reshape(self._sim.unpackFloatTable(rawDataF), [resF[1], -1])
+        xF =  yF * divs
+
+        xR = np.reshape(self._sim.unpackFloatTable(rawDataR), [resR[1], -1])
+        yR = -xR * divs
+
+        yB = -np.reshape(self._sim.unpackFloatTable(rawDataB), [resB[1], -1])
+        xB =  yB * divs
+                    
+        x = np.append(np.append(np.append(xL, xF), xR), xB)
+        y = np.append(np.append(np.append(yL, yF), yR), yB)
+
+        xImg = np.array((x + maxDist) * resL[0] / (2 * maxDist), dtype=int)
+        yImg = np.array(resL[0]- ((y + maxDist) * resL[0] / (2 * maxDist)), dtype=int)
+
+        # Channel 0: Binary obstacle map
+        obstacle_channel = np.ones((resL[0], resL[0]), 'uint8')
+        rr, cc = polygon(xImg, yImg, obstacle_channel.shape)
+        obstacle_channel[cc, rr] = 0
+
+        # Channel 1: Distance transform for obstacles
+        from scipy.ndimage import distance_transform_edt
+        distance_channel = distance_transform_edt(1 - obstacle_channel)
+        # Normalize relative to vehicle position (center of grid)
+        center_y, center_x = resL[0]//2, resL[0]//2
+        Y, X = np.ogrid[:resL[0], :resL[0]]
+        # Adjust distances based on distance from center
+        dist_from_center = np.sqrt((X - center_x)**2 + (Y - center_y)**2) / (resL[0]/2)
+        distance_channel = distance_channel * (1 - 0.5*dist_from_center)
+        distance_channel = distance_channel / distance_channel.max()
+
+        # Channel 2: Enhanced path information with wider path
+        path_channel = np.zeros((resL[0], resL[0]), 'uint8')
+        # Get base path points
+        path_points = self.pathOGLkAhdLin(np.shape(path_channel), maxDist)
+        # Dilate the path to make it wider
+        from scipy.ndimage import binary_dilation
+        path_kernel = np.ones((5,5))  # Adjust size for desired path width
+        path_channel = binary_dilation(path_points > 0, structure=path_kernel)
+        
+        # Channel 3: Distance to path
+        path_distance = distance_transform_edt(1 - path_channel)
+        path_distance = path_distance / path_distance.max()
+
+        # Stack all channels
+        multi_channel_grid = np.stack([
+            obstacle_channel,
+            distance_channel,
+            path_channel,
+            path_distance
+        ])
+
+        if(self._plot):
+            self._plot_occupancy_grid(multi_channel_grid, x, y)
+
+        return multi_channel_grid
+
+    def _plot_occupancy_grid(self, grid, raw_x=None, raw_y=None):
+        '''
+        Enhanced visualization of the multi-channel occupancy grid
+        '''
+        if not hasattr(self, '_fig') or not plt.fignum_exists(self._fig.number):
+            self._fig = plt.figure(figsize=(15, 5))
+            plt.ion()
+        
+        # Clear previous plots
+        plt.clf()
+        
+        # Plot raw sensor data if available
+        if raw_x is not None and raw_y is not None:
+            ax_raw = plt.subplot(151)
+            ax_raw.plot(raw_x, raw_y, 'k.')
+            ax_raw.set_title('Raw Sensor Data')
+            ax_raw.axis('equal')
+            ax_raw.grid(True)
+        
+        # Plot each channel
+        titles = ['Obstacles', 'Distance Field', 'Path', 'Path Distance']
+        for i, (channel, title) in enumerate(zip(grid, titles)):
+            ax = plt.subplot(1, 5, i+2)
+            if i == 0:  # Binary obstacle map
+                im = ax.imshow(channel, cmap='gray_r', origin='upper')
+            elif i == 2:  # Path
+                im = ax.imshow(channel, cmap='Greens', origin='upper')
+            else:  # Distance fields
+                im = ax.imshow(channel, cmap='viridis', origin='upper')
+            ax.set_title(title)
+            plt.colorbar(im, ax=ax)
+        
+        plt.tight_layout()
+        plt.draw()
+        plt.pause(0.001)
     
     def getVehicleSpeed(self):
         '''
@@ -561,7 +662,8 @@ class CoppeliaBridge:
         pathTrajectory = atan2(pathVector[1], pathVector[0])        
         # print(pathTrajectory)
         # print(rot[2])
-        orientErr =  -1*helper.pipi(pathTrajectory - rot[2])
+        orientErr = -1*helper.pipi(pathTrajectory - rot[2])
+        #print(orientErr)
 
         return pathError, orientErr
     
@@ -582,14 +684,14 @@ class CoppeliaBridge:
         self.vehicleCol =self._sim.createCollection(0)
         self._sim.addItemToCollection(self.vehicleCol,self._sim.handle_tree, self._egoVehicle,0)
     
-    def getCollision(self,vehicle, object = None):
+    def getCollision(self, vehicle, object = None):
         '''
         Check if the specified vehicle has collided with the specified object. Leave object empty if it is to be checked against everything in the environment
         Specific object handling is WIP
         '''
         if object == None: #If nothing specified, check against all objects
             object = self._sim.handle_all
-        res, dist, point,obj, n = self._sim.handleProximitySensor(self._proxSens)
+        res, dist, point, obj, n = self._sim.handleProximitySensor(self._proxSens)
         
         return res
     
@@ -599,14 +701,15 @@ class CoppeliaBridge:
         Pass in the occupancy grid. Occupancy grid calculated each time for performance reasons
         '''
         
-        #TODO: Confirm vehicle dimensions in the occupancy grid 70:110 is a bit of buffer
-        ogVehicle = og[70:110,70:110]
         
-        #Check values in the "vehicle" Area
-        if 1 in ogVehicle or 3 in ogVehicle:
-            return True
-        else:
-            return False
+        # Extract just the obstacle channel (channel 0)
+        obstacle_channel = og[0]
+        
+        # TODO: Confirm vehicle dimensions in the occupancy grid 70:110 is a bit of buffer
+        vehicle_area = obstacle_channel[70:110,70:110]
+        
+        # Check if any obstacles (1's) are present in the vehicle area
+        return np.any(vehicle_area == 1)
     
     def getVehicleState(self):
         '''
