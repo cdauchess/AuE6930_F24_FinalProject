@@ -4,3 +4,4 @@ agent_trained02.pt - 500 Episodes, 0-10 acceleration command bounds. Random init
 agent_trained03.pt - 400 Episodes, 0-1.5 acceleration command bounds. Random initial position along the path
 agent_trained04.pt - 1000 Episodes, 0-1 acceleration command bounds. Random initial position. 800 Episode length. Standard Reward (Training...)
 agent_trained05_CDD.pt - 1000 Episodes, 0-1 acceleration command bounds. Random initial position. 800 Episode length. Standard Reward. New Occupancy grid representation (channels), No action noise during training. Doesn't drive the track well. 
+agent_trained06.pt - 1000 episodes 0-1 acceleration commands. Random initial position. 800 Episode length. Standard Reward. Updated reward weights. Returned to 0.001 learning rates. Added function to ensure vehicle doesn't spawn on an obstacle.

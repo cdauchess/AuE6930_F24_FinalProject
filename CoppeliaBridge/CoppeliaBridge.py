@@ -36,7 +36,7 @@ class CoppeliaBridge:
     def initEgo(self):
         # Motion Constraints
         self._V_MAX = 1.5                 # max speed [m/s]
-        self._ACC_MAX = 3               # max acceleration [m/s2]
+        self._ACC_MAX = 1.5               # max acceleration [m/s2]
         self._D_MAX = radians(26)       # max steering angle
         
         # Sensor Constants
@@ -199,18 +199,18 @@ class CoppeliaBridge:
         startPathPos = self.checkInitPosition(startPathPos)
         
         startPoint = self._sim.getPathInterpolatedConfig((pathPos), pathLen, startPathPos) # Convert the position along path to an XYZ position in the path's frame
-        startPoint[2] = startPoint[2] +.2 #Offset in Z to keep vehicle above ground plane.
+        startPoint[2] = startPoint[2] +0.1 #Offset in Z to keep vehicle above ground plane.
 
         
-        lookAhead = 0.1
+        lookAhead = 0.25
         nextPos = startPathPos+lookAhead
-        #Compare to the final path position, wrap around if beyond that
-        if nextPos > pathLen[-1]:
-            nextPos = nextPos-pathLen[-1]
-        nextNearestPoint = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
+        if nextPos > self._totalLength:
+            nextPos = remainder(nextPos, self._totalLength)
         
-        pathVector = np.subtract(nextNearestPoint,startPoint)
-        pathTrajectory = atan(pathVector[1]/pathVector[0])
+        nextNearPt = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
+        
+        pathVector = np.subtract(nextNearPt, startPoint)
+        pathTrajectory = atan2(pathVector[1], pathVector[0])
         
         #Set the vehicle to the starting point
         self._sim.setObjectPosition(self._ego,startPoint[:3],self._lanes[pathNum])
@@ -383,16 +383,20 @@ class CoppeliaBridge:
         
         numPts = 5
         
+        pos, rot = self.getPose(self._front, self._world) #Find the pose of the center of the front axle
+        
+        yaw, pitch, roll = self._sim.alphaBetaGammaToYawPitchRoll(rot[0],rot[1],rot[2])
+        
         img = np.zeros(ogDim, dtype=np.uint8)
         xPt,yPt = self.pathPosLookAhead(LkAhd=maxDist,numPts=numPts)
         __, orientErr = self.getPathErrorPos()
 
         for n in range(numPts):
-            xPt[n], yPt[n] = helper.rotatePoint(xPt[n], yPt[n], -orientErr + np.pi/2)                   
+            xPt[n], yPt[n] = helper.rotatePoint(xPt[n], yPt[n], -yaw-(np.pi/2))                   
         
         #Cast to int and scale to pixel frame
-        xPt = [int((val*MperPx)+(ogSizeX/2)) for val in xPt]
-        yPt = [int((-1*val*MperPx)+(ogSizeY/2)) for val in yPt] #Negate Y due to occupancy grid more positive Y being behind the vehicle.
+        xPt = [int((-1*val*MperPx)+(ogSizeX/2)) for val in xPt]#Negate due to occupancy grid more positive being behind the vehicle.
+        yPt = [int((1*val*MperPx)+(ogSizeY/2)) for val in yPt] 
     
         #Bound the points to the size of the occupancy grid
         xPt = np.clip(xPt,0,ogSizeX-1)
@@ -702,7 +706,7 @@ class CoppeliaBridge:
         nextNearPt = self._sim.getPathInterpolatedConfig(pathPos, pathLen, nextPos)
         
         pathVector = np.subtract(nextNearPt, nearPt)
-        pathTrajectory = atan2(pathVector[1], pathVector[0])        
+        pathTrajectory = atan2(pathVector[1], pathVector[0])      
         # print(pathTrajectory)
         # print(rot[2])
         orientErr = -1*helper.pipi(pathTrajectory - rot[2])

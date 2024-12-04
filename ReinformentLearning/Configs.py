@@ -52,4 +52,4 @@ class DDPGConfig:
     noise_std: float = 0.1
     buffer_size: int = 10000
     batch_size: int = 128
-    action_bounds: tuple = ((-0.5, 0.5), (0, 1))  # ((steering_min, steering_max), (speed_min, speed_max))
+    action_bounds: tuple = ((-0.5, 0.5), (-1, 1))  # ((steering_min, steering_max), (speed_min, speed_max))
