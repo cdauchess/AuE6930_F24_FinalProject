@@ -10,20 +10,20 @@ from dataclasses import dataclass
 class RewardConfig:
     """Configuration for reward calculation"""
     # Vehicle limits
-    max_speed: float = 10.0      # m/s
-    max_path_error: float = 5.0  # meters
-    max_steering: float = 0.5    # radians
+    max_speed: float = 3.0
+    max_path_error: float = 1.0
+    max_steering: float = 0.5
     
     # Component weights
     speed_weight: float = 1.0
     path_error_weight: float = 1.0
-    steering_weight: float = 0.5
+    steering_weight: float = 1.0
     
     # Penalties and bonuses
-    collision_penalty: float = -1.0
+    collision_penalty: float = -2.0  # Increased penalty
     zero_speed_penalty: float = -1.0
-    max_path_error_penalty: float = -1.0
-    success_reward: float = 1.0
+    max_path_error_penalty: float = -2.0
+    success_reward: float = 2.0  # Increased reward for completing longer episodes
 
 '''
 
@@ -41,7 +41,7 @@ class RLReward:
         }
         
         # Default reward function
-        self.active_function = 'simple'
+        self.active_function = 'standard'
     
     def set_reward_function(self, function_name: str) -> bool:
         """
@@ -76,16 +76,36 @@ class RLReward:
             return self.config.max_path_error_penalty
         
         # Smooth exponential decay
-        reward = (np.exp(-1.0 * normalized_error)) * -self.config.max_path_error_penalty
+        reward = (np.exp(-5.0 * normalized_error))
         return self.config.path_error_weight * reward
     
-    def _orientation_reward(self, orientation: float) -> float:
-        # TODO: Calculate orientation component errror of reward
-        return 0
+    def _orientation_reward(self, orientation_error: float) -> float:
+        """
+        Calculate orientation reward based on heading error to path trajectory
+        orientation_error: Difference between vehicle heading and path trajectory
+        """
+        # Normalize to [-pi, pi]
+        normalized_error = np.arctan2(np.sin(orientation_error), np.cos(orientation_error))
+        
+        # Exponential reward that peaks at zero error and decays with larger errors
+        # exp(-x^2/2) gives smooth falloff and is always positive
+        reward = np.exp(-0.5 * (normalized_error ** 2))
+    
+        # Scale reward
+        return self.config.steering_weight * (2 * reward - 1)
+
     
     def _steering_reward(self, steering: float) -> float:
-        # TODO: Calculate steering component to encourage smooth control
-        return 0
+        """Calculate steering reward that encourages smooth, appropriate turning"""
+        normalized_steering = abs(steering) / self.config.max_steering
+        
+        # Small penalty for very aggressive steering (> 80% of max)
+        aggressive_steering_penalty = -0.5 * max(0, normalized_steering - 0.8)**2
+        
+        # Moderate penalty for rapid steering changes near limits
+        stability_reward = -0.2 * (normalized_steering**4)
+        
+        return aggressive_steering_penalty + stability_reward + 0.1
     
     def _simple_reward(self, state: Dict) -> float:
         """
@@ -107,25 +127,22 @@ class RLReward:
         return reward
 
     def _standard_reward(self, state: Dict) -> float:
-        """
-        Standard reward function combining speed, and path following, steering, and orientation
-        """
-        #TODO: Update with steer and orient.
-
         reward = 0.0
         
         # Core components
         reward += self._speed_reward(state['speed'])
         reward += self._path_error_reward(state['path_error'])
+        reward += self._orientation_reward(state['orientation_error'])
+        reward += self._steering_reward(state['steering'])
         
-        # Penalties and bonuses
+        # Penalties
         if state['collision']:
             reward += self.config.collision_penalty
-        
         if state['success']:
             reward += self.config.success_reward
             
         return reward
+
     
     def _smooth_reward(self, state: Dict) -> float:
         
@@ -151,41 +168,85 @@ class RLReward:
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     
-    # Create reward calculator with custom config
-    config = RewardConfig(
-        max_speed=10.0,
-        speed_weight=1.0,
-        path_error_weight=1.0,
-        steering_weight=0.5
-    )
-    reward_calc = RLReward(config)
+    reward_calc = RLReward()
     
-    # Plot path error reward function
-    errors = np.linspace(-5, 5, 200)
-    #errors = np.linspace(0, 10, 200)
-    rewards = [reward_calc._path_error_reward(error) for error in errors]
-    #rewards = [reward_calc._speed_reward(error) for error in errors]
+    # Create subplots for different reward components
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
     
-    plt.figure(figsize=(10, 6))
-    plt.plot(errors, rewards)
-    plt.title('Path Error Reward Function')
-    plt.xlabel('Path Error (m/s)')
-    plt.ylabel('Reward')
-    plt.grid(True)
+    # 1. Path Error Reward
+    errors = np.linspace(-reward_calc.config.max_path_error, reward_calc.config.max_path_error, 200)
+    path_rewards = [reward_calc._path_error_reward(error) for error in errors]
+    ax1.plot(errors, path_rewards)
+    ax1.set_title('Path Error Reward')
+    ax1.set_xlabel('Path Error (m)')
+    ax1.set_ylabel('Reward')
+    ax1.grid(True)
+    
+    # 2. Speed Reward
+    speeds = np.linspace(0, reward_calc.config.max_speed, 200)
+    speed_rewards = [reward_calc._speed_reward(speed) for speed in speeds]
+    ax2.plot(speeds, speed_rewards)
+    ax2.set_title('Speed Reward')
+    ax2.set_xlabel('Speed (m/s)')
+    ax2.set_ylabel('Reward')
+    ax2.grid(True)
+    
+    # 3. Orientation Reward
+    orientations = np.linspace(-np.pi, np.pi, 200)
+    orientation_rewards = [reward_calc._orientation_reward(orient) for orient in orientations]
+    ax3.plot(orientations, orientation_rewards)
+    ax3.set_title('Orientation Reward')
+    ax3.set_xlabel('Orientation Error (rad)')
+    ax3.set_ylabel('Reward')
+    ax3.grid(True)
+    
+    # 4. Steering Reward
+    steerings = np.linspace(-reward_calc.config.max_steering, reward_calc.config.max_steering, 200)
+    steering_rewards = [reward_calc._steering_reward(steer) for steer in steerings]
+    ax4.plot(steerings, steering_rewards)
+    ax4.set_title('Steering Reward')
+    ax4.set_xlabel('Steering Angle (rad)')
+    ax4.set_ylabel('Reward')
+    ax4.grid(True)
+    
+    plt.tight_layout()
     plt.show()
     
-    # Example usage
-    state = {
-        'speed': 5.0,
-        'path_error': 0.3,
-        'steering': 0.1,
-        'collision': False,
-        'success': False
-    }
+    # Test different reward functions with example states
+    test_states = [
+        {
+            'speed': 0.0,
+            'path_error': 0.0,
+            'orientation_error': 0.0,
+            'steering': 0.0,
+            'collision': False,
+            'success': False,
+            'description': 'Ideal State'
+        },
+        {
+            'speed': 1.0,
+            'path_error': 0.3,
+            'orientation_error': 0.1,
+            'steering': 0.1,
+            'collision': False,
+            'success': False,
+            'description': 'Normal Operation'
+        },
+        {
+            'speed': 1.5,
+            'path_error': 2.0,
+            'orientation_error': 0.5,
+            'steering': 0.4,
+            'collision': False,
+            'success': False,
+            'description': 'Large Error State'
+        }
+    ]
     
-    # Try different reward functions
-    print("\nReward values for example state:")
-    for func_name in reward_calc.get_available_functions():
-        reward_calc.set_reward_function(func_name)
-        reward = reward_calc.calculate_reward(state)
-        print(f"{func_name}: {reward:.3f}")
+    print("\nReward values for different states:")
+    for state in test_states:
+        print(f"\n{state['description']}:")
+        for func_name in reward_calc.get_available_functions():
+            reward_calc.set_reward_function(func_name)
+            reward = reward_calc.calculate_reward(state)
+            print(f"{func_name:8}: {reward:.3f}")

@@ -39,16 +39,16 @@ class VehicleState(NamedTuple):
         return cls(
             position=np.array(vehicle_state['Position'], dtype=np.float32),
             orientation=vehicle_state['Orientation'],
-            speed=vehicle_state['Speed'],
-            steering=vehicle_state['Steering'],
-            path_error=np.array([path_error, orient_error], dtype=np.float32),
+            speed=vehicle_state['Speed'], # ???
+            steering=vehicle_state['Steering'], # -pi/2 to pi/2
+            path_error=np.array([path_error, orient_error], dtype=np.float32), # [-5 to 5], [-pi, pi]
             occupancy_grid=np.array(occupancy_grid, dtype=np.float32)
         )
     
     def get_network_inputs(self) -> Tuple[torch.Tensor, torch.Tensor]:
 
-        # Process occupancy grid - ensure shape is [1, H, W]
-        grid_tensor = torch.FloatTensor(self.occupancy_grid).unsqueeze(0)
+        # Process occupancy grid - ensure shape is [C, H, W]
+        grid_tensor = torch.FloatTensor(self.occupancy_grid)
         
         # Process vehicle dynamics - create flat vector with relevant state components
         dynamics = np.concatenate([

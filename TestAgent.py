@@ -3,11 +3,11 @@ from ReinformentLearning.Environment import RLEnvironment, EpisodeConfig
 from ReinformentLearning.RLAgent import DDPGAgent, DDPGConfig
 import time
 
-def test_agent(model_path: str, num_episodes: int = 5):
+def test_agent(model_path: str, num_episodes: int = 3):
     # Create environment
     bridge = CoppeliaBridge()
     config = EpisodeConfig(
-        max_steps=200,
+        max_steps=1000,
         position_range=1.0,
         orientation_range=0.5,
         max_path_error=1.0
@@ -23,22 +23,22 @@ def test_agent(model_path: str, num_episodes: int = 5):
     agent_config = DDPGConfig(
         state_dim=vector_dim,
         action_dim=2,
-        hidden_dim=128,
-        action_bounds=((-0.5, 0.5), (0, 10))
+        hidden_dim=256,
+        action_bounds=((-0.5, 0.5), (0, 1))
     )
     agent = DDPGAgent(agent_config)
     agent.load(model_path)
     
     print(f"Starting testing of model: {model_path}")
     for episode in range(num_episodes):
-        state = env.reset(randomize=False)
+        state = env.reset(randomize=True)
         episode_reward = 0
         steps = 0
         
         print(f"\nStarting Test Episode {episode + 1}")
         
         while True:
-            action = agent.select_action(state, add_noise=False)
+            action = agent.select_action(state, add_noise=False) 
             next_state, reward, done, info = env.step(action)
             episode_reward += reward
             steps += 1
@@ -63,4 +63,4 @@ def test_agent(model_path: str, num_episodes: int = 5):
         time.sleep(1)
 
 if __name__ == "__main__":
-    test_agent("agent_trained.pt")
+    test_agent("TrainedAgents/agent_trained05_CDD.pt")

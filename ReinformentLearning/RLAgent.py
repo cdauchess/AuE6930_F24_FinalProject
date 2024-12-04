@@ -34,6 +34,8 @@ class DDPGAgent:
     def __init__(self, config: DDPGConfig):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(self.device)
+        torch.serialization.add_safe_globals([DDPGConfig])
         
         # Actor Networks
         self.actor = ActorNetwork(
@@ -68,6 +70,8 @@ class DDPGAgent:
     
     def select_action(self, state: VehicleState, add_noise: bool = True) -> VehicleAction:
         grid_input, vector_input = state.get_network_inputs()
+        
+        # Add batch dimension
         grid_input = grid_input.unsqueeze(0).to(self.device)
         vector_input = vector_input.unsqueeze(0).to(self.device)
         

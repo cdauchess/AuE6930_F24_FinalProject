@@ -10,7 +10,7 @@ class ActorNetwork(nn.Module):
         self.action_bounds = action_bounds
         
         self.conv_stream = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=2),
+            nn.Conv2d(4, 16, kernel_size=3, stride=2),
             nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.Conv2d(16, 32, kernel_size=3, stride=2),
@@ -55,7 +55,7 @@ class ActorNetwork(nn.Module):
                 nn.init.zeros_(m.bias)
     
     def _get_conv_output_size(self, grid_size: int) -> int:
-        dummy_input = torch.zeros(1, 1, grid_size, grid_size)
+        dummy_input = torch.zeros(1, 4, grid_size, grid_size)
         with torch.no_grad():
             conv_out = self.conv_stream(dummy_input)
         return int(np.prod(conv_out.shape[1:]))
@@ -82,7 +82,7 @@ class CriticNetwork(nn.Module):
         super(CriticNetwork, self).__init__()
         
         self.conv_stream = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=2),
+            nn.Conv2d(4, 16, kernel_size=3, stride=2),
             nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.Conv2d(16, 32, kernel_size=3, stride=2),
@@ -131,7 +131,7 @@ class CriticNetwork(nn.Module):
                 nn.init.zeros_(m.bias)
     
     def _get_conv_output_size(self, grid_size: int) -> int:
-        dummy_input = torch.zeros(1, 1, grid_size, grid_size)
+        dummy_input = torch.zeros(1, 4, grid_size, grid_size)
         with torch.no_grad():
             conv_out = self.conv_stream(dummy_input)
         return int(np.prod(conv_out.shape[1:]))

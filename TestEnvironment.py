@@ -1,5 +1,6 @@
 from CoppeliaBridge.CoppeliaBridge import CoppeliaBridge
 from ReinformentLearning.Environment import RLEnvironment, EpisodeConfig
+from ReinformentLearning.VehicleHandler import VehicleState, VehicleAction
 import numpy as np
 import time
 
@@ -26,23 +27,24 @@ def test_rl_environment():
         # Reset environment
         state = env.reset(randomize=True)
         print("Reset complete.")
-        print(f"Initial state: {state}")
+        #print(f"Initial state: {state}")
         print(f"Simulation running: {bridge.isRunning()}")
         
         # Run episode
         done = False
         while not done:
             # Simple test policy
-            action = (1, 0.2 * np.sin(env.current_step * 0.1))
+            action = VehicleAction(steering=-0.2 * np.sin(env.current_step * 0.1), acceleration=1)
+            
             
             # Step environment
             new_state, reward, done, info = env.step(action)
             
             # Print progress every 50 steps
             if env.current_step % 50 == 0:
-                print(f"Step {info['step']}, Path Error: {new_state['path_error']}")
-                print(f"Current Speed: {new_state['speed']}")
-                print(f"Current Steering: {new_state['steering']}")
+                print(f"Step {info['step']}, Path Error: {new_state.path_error[0]}")
+                print(f"Current Speed: {new_state.speed}")
+                print(f"Current Steering: {new_state.steering}")
         
         # Get episode statistics
         stats = env.get_episode_stats()

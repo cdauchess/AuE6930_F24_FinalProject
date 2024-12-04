@@ -40,7 +40,7 @@ class RLEnvironment:
         time.sleep(0.5)
         
         self.bridge.setSimStepping(True)
-        self.bridge.startSimulation()
+        self.bridge.startSimulation(True)
         self.bridge.renderState(self.config.render_enabled)
         time.sleep(0.5)
         
@@ -52,7 +52,8 @@ class RLEnvironment:
 
         # Set vehicle pose
         if randomize:
-            self._set_random_pose()
+            self.bridge.setInitPosition(startPos=np.random.rand())
+            #self._set_random_pose()
         else:
             self.bridge.setVehiclePose(self.initial_pose[0], self.initial_pose[1])
         
@@ -65,8 +66,9 @@ class RLEnvironment:
 
     def step(self, action: VehicleAction) -> Tuple[VehicleState, float, bool, Dict]:
         """Execute action and return new state, reward, done flag, and info"""
+        
         # Apply action
-        self.bridge.setVehicleSpeed(action.acceleration)
+        self.bridge.setMotion(action.acceleration)
         self.bridge.setSteering(action.steering)
         
         # Step simulation
@@ -102,10 +104,12 @@ class RLEnvironment:
         return new_state, reward, done, info
 
     def _success(self, state: VehicleState) -> bool:
-        """Episode succeeds if path completed within error bounds"""
+        """Episode succeeds if path completed within error bounds consistently"""
+        # Require at least 600 steps (75% of max) with good performance
         return (
-            self.current_step >= self.config.max_steps and
-            abs(state.path_error[0]) < self.config.max_path_error * 0.5
+            self.current_step >= 600 and
+            abs(state.path_error[0]) < self.config.max_path_error * 0.4 and
+            abs(state.path_error[1]) < 0.3  # Check orientation error
         )
     
     def _is_done(self, state: VehicleState) -> bool:
