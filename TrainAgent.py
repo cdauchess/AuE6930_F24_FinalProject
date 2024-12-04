@@ -97,4 +97,4 @@ def train_agent(num_episodes: int = 10):
     print("Training completed. Model saved as 'agent_trained.pt'")
 
 if __name__ == "__main__":
-    train_agent(num_episodes=1000)
+    train_agent(num_episodes=10)
