@@ -68,7 +68,7 @@ class DDPGAgent:
         # Replay buffer
         self.memory = ReplayBuffer(config.buffer_size)
     
-    def select_action(self, state: VehicleState, add_noise: bool = False) -> VehicleAction:
+    def select_action(self, state: VehicleState, add_noise: bool = True) -> VehicleAction:
         grid_input, vector_input = state.get_network_inputs()
         
         # Add batch dimension

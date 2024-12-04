@@ -20,7 +20,7 @@ class CoppeliaBridge:
         self._isEgoReady = False
         
         self._client = RemoteAPIClient()
-        self._client.getObject("sim").loadScene("/home/kvadner/Desktop/AuE6930_F24_FinalProject/Scenes/QScene5.ttt")       
+        #self._client.getObject("sim").loadScene("/home/kvadner/Desktop/AuE6930_F24_FinalProject/Scenes/QScene5.ttt")       
         self._sim = self._client.require('sim')
         
         self._sim.setStepping(True)

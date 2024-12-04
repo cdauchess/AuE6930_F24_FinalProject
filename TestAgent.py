@@ -63,4 +63,4 @@ def test_agent(model_path: str, num_episodes: int = 3):
         time.sleep(1)
 
 if __name__ == "__main__":
-    test_agent("agent_trained.pt")
+    test_agent("TrainedAgents/agent_trained05_CDD.pt")

@@ -31,13 +31,13 @@ class RewardConfig:
     # Component weights
     speed_weight: float = 1.0
     path_error_weight: float = 1.0
-    steering_weight: float = 1.0
+    steering_weight: float = 0.25
     
     # Penalties and bonuses
-    collision_penalty: float = -5.0  # Increased penalty
-    zero_speed_penalty: float = -1.0
-    max_path_error_penalty: float = -2.0
-    success_reward: float = 5.0  # Increased reward for completing longer episodes
+    collision_penalty: float = -100.0  # Increased penalty
+    zero_speed_penalty: float = -10.0
+    max_path_error_penalty: float = -10.0
+    success_reward: float = 10.0  # Increased reward for completing longer episodes
 
 @dataclass
 class DDPGConfig:
@@ -45,8 +45,8 @@ class DDPGConfig:
     state_dim: int = 5
     action_dim: int = 2  # [steering, speed]
     hidden_dim: int = 256
-    actor_lr: float = 0.01
-    critic_lr: float = 0.01
+    actor_lr: float = 0.001
+    critic_lr: float = 0.001
     gamma: float = 0.99
     tau: float = 0.001  # For soft target updates
     noise_std: float = 0.1

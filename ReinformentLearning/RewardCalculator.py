@@ -76,7 +76,7 @@ class RLReward:
             return self.config.max_path_error_penalty
         
         # Smooth exponential decay
-        reward = (np.exp(-2.0 * normalized_error))
+        reward = (np.exp(-5.0 * normalized_error))
         return self.config.path_error_weight * reward
     
     def _orientation_reward(self, orientation_error: float) -> float:
