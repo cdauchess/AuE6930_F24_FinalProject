@@ -1,0 +1,49 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" version="25.0.1">
+  <diagram name="Page-1" id="n50tBvy6i8SXTLx93v9D">
+    <mxGraphModel dx="794" dy="420" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-1" value="Binary Obstacles Information" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="150" y="40" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-2" value="Distance Transform (Ego Vehicle)" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="150" y="140" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-3" value="Binary&lt;div&gt;Path Information&lt;/div&gt;" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="150" y="240" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-4" value="Distance Transform (Path)" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="150" y="340" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eQUzuJFwAodfLQFTEGiu-5" target="eQUzuJFwAodfLQFTEGiu-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-5" value="Channeled Occupancy Grid" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="227" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0;entryDx=0;entryDy=30;entryPerimeter=0;" edge="1" parent="1" source="eQUzuJFwAodfLQFTEGiu-1" target="eQUzuJFwAodfLQFTEGiu-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0;entryDx=0;entryDy=30;entryPerimeter=0;" edge="1" parent="1" source="eQUzuJFwAodfLQFTEGiu-2" target="eQUzuJFwAodfLQFTEGiu-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0;entryDx=0;entryDy=30;entryPerimeter=0;" edge="1" parent="1" source="eQUzuJFwAodfLQFTEGiu-3" target="eQUzuJFwAodfLQFTEGiu-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0;entryDx=0;entryDy=30;entryPerimeter=0;" edge="1" parent="1" source="eQUzuJFwAodfLQFTEGiu-4" target="eQUzuJFwAodfLQFTEGiu-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eQUzuJFwAodfLQFTEGiu-10" target="eQUzuJFwAodfLQFTEGiu-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-10" value="Vehicle Dynamics Vector" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="117" width="80" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="eQUzuJFwAodfLQFTEGiu-11" value="Vehicle State" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="530" y="167" width="120" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
