@@ -90,6 +90,12 @@ def train_agent(num_episodes: int = 10):
             print(f"  Mean Path Error: {env.get_episode_stats().mean_path_error:.2f}")
             print(f"  Actor Loss: {actor_loss:.3f}")
             print(f"  Critic Loss: {critic_loss:.3f}")
+            
+        if (episode + 1) % 50 == 0:
+            # Save agent and plot metrics
+            agent.save("agent_trained.pt")
+            plot_training_metrics(episode_rewards, episode_losses, mean_path_errors)
+            print('Training Checkpoint Saved!')
     
     # Save agent and plot metrics
     agent.save("agent_trained.pt")
@@ -97,4 +103,4 @@ def train_agent(num_episodes: int = 10):
     print("Training completed. Model saved as 'agent_trained.pt'")
 
 if __name__ == "__main__":
-    train_agent(num_episodes=1000)
+    train_agent(num_episodes=400)
