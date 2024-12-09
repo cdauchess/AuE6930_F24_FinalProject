@@ -28,6 +28,7 @@ class VehicleState(NamedTuple):
     steering: float             # steering angle
     path_error: np.ndarray      # [lateral_error, heading_error]
     occupancy_grid: np.ndarray  # binary grid representing obstacles
+    distance : float            # Distance traveled in the current step
 
     @classmethod
     def from_bridge(cls, bridge: CoppeliaBridge):
@@ -42,7 +43,8 @@ class VehicleState(NamedTuple):
             speed=vehicle_state['Speed'], # ???
             steering=vehicle_state['Steering'], # -pi/2 to pi/2
             path_error=np.array([path_error, orient_error], dtype=np.float32), # [-5 to 5], [-pi, pi]
-            occupancy_grid=np.array(occupancy_grid, dtype=np.float32)
+            occupancy_grid=np.array(occupancy_grid, dtype=np.float32),
+            distance = vehicle_state['distance']
         )
     
     def get_network_inputs(self) -> Tuple[torch.Tensor, torch.Tensor]:
