@@ -24,7 +24,7 @@ def test_agent(model_path: str, num_episodes: int = 3):
         state_dim=vector_dim,
         action_dim=2,
         hidden_dim=256,
-        action_bounds=((-0.5, 0.5), (0, 1))
+        action_bounds=((-0.5, 0.5), (-1, 1))
     )
     agent = DDPGAgent(agent_config)
     agent.load(model_path)
@@ -40,6 +40,7 @@ def test_agent(model_path: str, num_episodes: int = 3):
         while True:
             action = agent.select_action(state, add_noise=False) 
             next_state, reward, done, info = env.step(action)
+            
             episode_reward += reward
             steps += 1
             
@@ -48,6 +49,7 @@ def test_agent(model_path: str, num_episodes: int = 3):
                 print(f"  Acceleration: {action.acceleration:.2f} m/s²")
                 print(f"  Steering: {action.steering:.2f} rad")
                 print(f"  Path Error: {next_state.path_error[0]:.2f} m")
+                bridge.moveObstacles(2)
             
             if done:
                 break

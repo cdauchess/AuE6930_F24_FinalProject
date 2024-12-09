@@ -6,6 +6,7 @@
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
 from skimage.draw import polygon, line, bezier_curve
 from math import pi, tan, atan2, radians, remainder, atan, sin, cos
@@ -32,6 +33,7 @@ class CoppeliaBridge:
 
         self.initEgo()
         self.initScene()
+        self.configObsMotion() #Set defaults
         
     def initEgo(self):
         # Motion Constraints
@@ -92,7 +94,8 @@ class CoppeliaBridge:
 
         self._laneCount = len(self._lanes)
         self.switchLane(0)  
-        self.getObstacleInfo(9,0)    
+        self.getObstacleInfo(9,0)
+        self._origObsPos = self.getObstaclePos(self._world)    
 
     # Section: Application behavior
     def startSimulation(self, renderEnable = False):
@@ -140,6 +143,51 @@ class CoppeliaBridge:
         
         return pathPositions, pathQuaternions, pathLengths    
     
+    
+    
+    def getObstaclePos(self,frame, numObstacles = 9):
+        obsPos = []
+        self._obsHandle = []
+        
+        for i in range(numObstacles):
+            self._obsHandle.append(self._sim.getObject("/Obs[" + str(i)+"]", {'noError' : True}))
+            if self._obsHandle[i] >= 0:
+                obsPos.append(self._sim.getObjectPosition(self._obsHandle[i], frame))
+            else: 
+                break
+        
+        return obsPos
+    
+    def configObsMotion(self,distance = 0.75, speed = 0.1):
+        self._obsDist = distance
+        self._obsSpeed = speed
+        
+    def moveObstacles(self,numMove=1):
+        #obsPos = self.getObstaclePos( self._world,9)
+        
+        obsToMove = random.sample(range(len(self._obsHandle)),numMove)
+        
+        for i in obsToMove:
+            #Find how far to move
+            
+            obsPos = self._sim.getObjectPosition(self._obsHandle[i], self._world)
+            
+            xMov = random.uniform(-self._obsSpeed,self._obsSpeed)
+            yMov = random.uniform(-self._obsSpeed,self._obsSpeed)
+            
+            newX = obsPos[0]+xMov
+            newY = obsPos[1]+yMov
+            
+            
+            newX = helper.bound(newX,self._origObsPos[i][0]-self._obsDist,self._origObsPos[i][0]+self._obsDist)
+            newY = helper.bound(newY,self._origObsPos[i][1]-self._obsDist,self._origObsPos[i][1]+self._obsDist)
+            
+            newPos = [newX,newY,0.2]
+            print(i)
+            print(newPos)
+            
+            self._sim.setObjectPosition(self._obsHandle[i],newPos,self._sim.handle_world)
+    
     #Find the nearest points along the path for each obstacle
     def getObstacleInfo(self,numObstacles = 9, pathNum = 0):
         
@@ -147,13 +195,10 @@ class CoppeliaBridge:
         pathPos = self._pathPoints     
         pathLen = self._pathLengths
         
-        for i in range(numObstacles):
-            obsHandle = self._sim.getObject("/Obs[" + str(i)+"]", {'noError' : True})
-            if obsHandle >= 0:
-                obsPos = self._sim.getObjectPosition(obsHandle, self._lanes[pathNum])
-                self._obsPosPath.append(self._sim.getClosestPosOnPath(pathPos, pathLen, obsPos))
-            else: 
-                break
+        obsPos = self.getObstaclePos( self._lanes[pathNum],numObstacles)
+        
+        for i in range(len(obsPos)):
+            self._obsPosPath.append(self._sim.getClosestPosOnPath(pathPos, pathLen, obsPos[i]))
             
             
     def checkInitPosition(self,initPos, obsRad = 0.5, offset = 0.5):
