@@ -20,6 +20,8 @@ class RLEnvironment:
         self.current_step = 0
         self.episode_reward = 0.0
         self.path_errors = []
+        self.vehicle_speed = []
+        self.distance_traveled = 0
         
         # Initial pose - we'll get this once during initialization
         self.initial_pose = self._get_initial_pose()
@@ -48,6 +50,8 @@ class RLEnvironment:
         self.current_step = 0
         self.episode_reward = 0.0
         self.path_errors = []
+        self.vehicle_speed = []
+        self.distance_traveled = 0
         self.episode_count += 1
 
         # Set vehicle pose
@@ -90,6 +94,8 @@ class RLEnvironment:
         
         self.episode_reward += reward
         self.path_errors.append(new_state.path_error[0])
+        self.vehicle_speed.append(new_state.speed)
+        self.distance_traveled += new_state.distance
         
         # Check termination
         done = self._is_done(new_state)
@@ -144,5 +150,7 @@ class RLEnvironment:
             total_reward=self.episode_reward,
             mean_path_error=np.mean(self.path_errors),
             max_path_error=np.max(self.path_errors),
-            success=self.current_step >= self.config.max_steps
+            success=self.current_step >= self.config.max_steps,
+            mean_speed = np.mean(self.vehicle_speed),
+            distance_traveled= self.distance_traveled
         )

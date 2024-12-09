@@ -59,6 +59,8 @@ class CoppeliaBridge:
         self._d = 0                     # steering Angle
         
         self._ego = self._sim.getObject('/qcar')
+        self._curPos, __ = self.getEgoPoseAbsolute() #Initial Position of Qcar
+        
         self._front = self._sim.getObject('/qcar/Front')
 
         self._lDriveWheel = self._sim.getObject('/qcar/base_wheelrl_joint')
@@ -102,6 +104,7 @@ class CoppeliaBridge:
         self.renderState(renderEnable)
         self._sim.startSimulation()
         self._isRunning = True
+        self._curPos,__ = self.getEgoPoseAbsolute()
 
     def pauseSimulation(self):
         '''
@@ -758,6 +761,14 @@ class CoppeliaBridge:
         # Check if any obstacles (1's) are present in the vehicle area
         return np.any(vehicle_area == 1)
     
+    def getDistance(self):
+        newPos, __ = self.getEgoPoseAbsolute()
+        
+        distance_Traveled = np.linalg.norm(np.subtract(newPos,self._curPos))
+        self._curPos = newPos
+        
+        return distance_Traveled
+    
     def getVehicleState(self):
         '''
         Function to package the current vehicle state into a dictionary
@@ -765,11 +776,14 @@ class CoppeliaBridge:
         pos, rot = self.getEgoPoseAbsolute()
         v = self.getVehicleSpeed()
         d = self.getSteeringAngle()
+        dist = self.getDistance()
+        
         
         X = {"Position": pos[0:1],
              "Orientation": rot[2],
              "Speed": v,
-             "Steering": d }
+             "Steering": d,
+             "distance": dist}
         
         return X
     

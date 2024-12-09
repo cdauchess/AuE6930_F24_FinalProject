@@ -59,6 +59,8 @@ def test_agent(model_path: str, num_episodes: int = 3):
         print(f"  Steps: {steps}")
         print(f"  Total Reward: {episode_reward:.2f}")
         print(f"  Mean Path Error: {stats.mean_path_error:.2f}")
+        print(f"  Mean Speed: {stats.mean_speed:.2f}")
+        print(f"  Distance Traveled: {stats.distance_traveled:.2f}")
         
         time.sleep(1)
 

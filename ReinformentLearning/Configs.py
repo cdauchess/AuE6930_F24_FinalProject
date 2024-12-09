@@ -19,6 +19,8 @@ class EpisodeStats:
     mean_path_error: float
     max_path_error: float
     success: bool
+    mean_speed: float
+    distance_traveled: float
 
 @dataclass
 class RewardConfig:
