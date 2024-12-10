@@ -35,7 +35,7 @@ class CoppeliaBridge:
         
     def initEgo(self):
         # Motion Constraints
-        self._V_MAX = 1.5                 # max speed [m/s]
+        self._V_MAX = 2.0                 # max speed [m/s]
         self._ACC_MAX = 1.5               # max acceleration [m/s2]
         self._D_MAX = radians(26)       # max steering angle
         

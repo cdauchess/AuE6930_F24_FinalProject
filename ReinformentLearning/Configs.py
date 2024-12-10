@@ -3,7 +3,7 @@ from dataclasses import dataclass
 @dataclass
 class EpisodeConfig:
     """Configuration for RL episodes"""
-    max_steps: int = 800  # Increased from 200
+    max_steps: int = 500  # Increased from 200
     position_range: float = 1.0
     orientation_range: float = 0.1
     max_path_error: float = 1.0
@@ -33,7 +33,7 @@ class RewardConfig:
     # Component weights
     speed_weight: float = 1.0
     path_error_weight: float = 1.0
-    steering_weight: float = 0.25
+    steering_weight: float = 1.0
     
     # Penalties and bonuses
     collision_penalty: float = -100.0  # Increased penalty

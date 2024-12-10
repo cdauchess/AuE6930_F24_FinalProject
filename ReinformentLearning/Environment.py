@@ -114,8 +114,8 @@ class RLEnvironment:
         # Require at least 600 steps (75% of max) with good performance
         return (
             self.current_step >= 600 and
-            abs(state.path_error[0]) < self.config.max_path_error * 0.4 and
-            abs(state.path_error[1]) < 0.3  # Check orientation error
+            abs(state.path_error[0]) < self.config.max_path_error * 0.2 and
+            abs(state.path_error[1]) < 0.1  # Check orientation error
         )
     
     def _is_done(self, state: VehicleState) -> bool:
