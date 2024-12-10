@@ -1,54 +1,87 @@
-from collections import deque
+from typing import Tuple, List, Dict
 import numpy as np
-import random
-from typing import Tuple, List
+import torch
+from collections import deque, namedtuple
 from .VehicleHandler import VehicleState, VehicleAction
+
+# Define a transition tuple for more efficient storage
+Transition = namedtuple('Transition', [
+    'grid_input', 'vector_input',  # State
+    'action',                      # Action
+    'reward',                      # Reward
+    'next_grid_input', 'next_vector_input',  # Next State
+    'done'                         # Done flag
+])
 
 class ReplayBuffer:
     """
-    A circular buffer for storing and sampling transitions for DDPG.
-    Specifically handles continuous action spaces.
+    Optimized replay buffer with pre-processing and batching capabilities
     """
-    def __init__(self, capacity: int):
-        self.buffer = deque(maxlen=capacity)
+    def __init__(self, capacity: int, device: torch.device):
         self.capacity = capacity
+        self.device = device
+        self.buffer = deque(maxlen=capacity)
+        self.position = 0
         
-    def push(self, 
-            state: VehicleState,
-            action: VehicleAction,
-            reward: float,
-            next_state: VehicleState,
-            done: bool):
-
-        # Store transition in buffer 
+    def push(self, state: VehicleState, action: VehicleAction, 
+            reward: float, next_state: VehicleState, done: bool):
+        """Store preprocessed transition in buffer"""
+        # Pre-process state and next_state
+        grid_input, vector_input = state.get_network_inputs()
+        next_grid_input, next_vector_input = next_state.get_network_inputs()
+        
+        # Convert action to numpy array
         action_array = action.to_numpy()
-        self.buffer.append((state, action_array, reward, next_state, done))
+        
+        # Create transition
+        transition = Transition(
+            grid_input=grid_input.numpy(),
+            vector_input=vector_input.numpy(),
+            action=action_array,
+            reward=reward,
+            next_grid_input=next_grid_input.numpy(),
+            next_vector_input=next_vector_input.numpy(),
+            done=done
+        )
+        
+        # Store transition
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(transition)
+        else:
+            self.buffer[self.position] = transition
+            
+        self.position = (self.position + 1) % self.capacity
     
-    def sample(self, batch_size: int) -> Tuple[List[VehicleState], 
-                                              List[VehicleAction],
-                                              np.ndarray, # Rewards
-                                              List[VehicleState],
-                                              np.ndarray]: # Dones
-        transitions = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*transitions)
+    def sample(self, batch_size: int) -> Tuple[torch.Tensor, ...]:
+        """Sample a batch of transitions and return tensorized batch"""
+        assert len(self.buffer) >= batch_size, "Not enough transitions in buffer"
         
-        # Convert actions back to VehicleAction objects
-        actions = [VehicleAction.from_numpy(a) for a in actions]
+        # Randomly sample indices
+        indices = np.random.choice(len(self.buffer), batch_size, replace=False)
+        batch = [self.buffer[idx] for idx in indices]
         
-        rewards = np.array(rewards, dtype=np.float32)
-        dones = np.array(dones, dtype=np.float32)
+        # Prepare batch tensors
+        grid_inputs = torch.FloatTensor(np.stack([t.grid_input for t in batch])).to(self.device)
+        vector_inputs = torch.FloatTensor(np.stack([t.vector_input for t in batch])).to(self.device)
+        actions = torch.FloatTensor(np.stack([t.action for t in batch])).to(self.device)
+        rewards = torch.FloatTensor(np.stack([t.reward for t in batch])).unsqueeze(1).to(self.device)
+        next_grid_inputs = torch.FloatTensor(np.stack([t.next_grid_input for t in batch])).to(self.device)
+        next_vector_inputs = torch.FloatTensor(np.stack([t.next_vector_input for t in batch])).to(self.device)
+        dones = torch.FloatTensor(np.stack([t.done for t in batch])).unsqueeze(1).to(self.device)
         
-        return list(states), actions, rewards, list(next_states), dones
+        return (grid_inputs, vector_inputs, actions, rewards, 
+                next_grid_inputs, next_vector_inputs, dones)
     
     def __len__(self) -> int:
-        """Get current number of transitions in buffer"""
         return len(self.buffer)
     
     def clear(self):
-        """Clear all transitions from buffer"""
+        """Clear the buffer"""
         self.buffer.clear()
-
-    def get_statistics(self) -> dict:
+        self.position = 0
+        
+    def get_statistics(self) -> Dict:
+        """Get buffer statistics"""
         if len(self.buffer) == 0:
             return {
                 "size": 0,
@@ -56,18 +89,22 @@ class ReplayBuffer:
                 "percent_full": 0.0
             }
         
-        # Calculate basic stats
-        rewards = [transition[2] for transition in self.buffer]
-        actions = np.array([transition[1] for transition in self.buffer])
+        # Calculate statistics from stored transitions
+        rewards = np.array([t.reward for t in self.buffer])
+        actions = np.stack([t.action for t in self.buffer])
         
         return {
             "size": len(self.buffer),
             "capacity": self.capacity,
             "percent_full": len(self.buffer) / self.capacity * 100,
-            "mean_reward": np.mean(rewards),
-            "std_reward": np.std(rewards),
-            "min_reward": np.min(rewards),
-            "max_reward": np.max(rewards),
-            "mean_action": np.mean(actions, axis=0),
-            "std_action": np.std(actions, axis=0)
+            "reward_stats": {
+                "mean": np.mean(rewards),
+                "std": np.std(rewards),
+                "min": np.min(rewards),
+                "max": np.max(rewards)
+            },
+            "action_stats": {
+                "mean": np.mean(actions, axis=0),
+                "std": np.std(actions, axis=0)
+            }
         }

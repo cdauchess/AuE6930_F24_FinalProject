@@ -30,14 +30,13 @@ class OUNoise:
         return self.state
 
 class DDPGAgent:
-    """DDPG Agent for continuous vehicle control"""
+    """DDPG Agent with optimized training process"""
     def __init__(self, config: DDPGConfig):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(self.device)
-        torch.serialization.add_safe_globals([DDPGConfig])
+        print(f"Using device: {self.device}")
         
-        # Actor Networks
+        # Initialize networks (same as before)
         self.actor = ActorNetwork(
             vector_dim=config.state_dim,
             grid_size=180,
@@ -48,7 +47,6 @@ class DDPGAgent:
         
         self.target_actor = copy.deepcopy(self.actor)
         
-        # Critic Networks
         self.critic = CriticNetwork(
             vector_dim=config.state_dim,
             grid_size=180,
@@ -62,11 +60,70 @@ class DDPGAgent:
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=config.actor_lr)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=config.critic_lr)
         
-        # Noise process for exploration
+        # Noise process
         self.noise = OUNoise(config.action_dim)
         
-        # Replay buffer
-        self.memory = ReplayBuffer(config.buffer_size)
+        # Optimized replay buffer
+        self.memory = ReplayBuffer(config.buffer_size, self.device)
+        
+        # Initialize gradients scaler for mixed precision training
+        self.scaler = torch.amp.GradScaler(str(self.device))
+        
+    def train(self, batch_size: int) -> Tuple[float, float]:
+        """Optimized training process with efficient batch processing"""
+        if len(self.memory) < batch_size:
+            return 0.0, 0.0
+            
+        # Sample batch - returns preprocessed tensors
+        (grid_inputs, vector_inputs, actions, rewards,
+         next_grid_inputs, next_vector_inputs, dones) = self.memory.sample(batch_size)
+        
+        # Update Critic
+        with torch.amp.autocast(str(self.device)):
+            with torch.no_grad():
+                next_actions = self.target_actor(next_grid_inputs, next_vector_inputs)
+                target_q = self.target_critic(next_grid_inputs, next_vector_inputs, next_actions)
+                target_q = rewards + (1 - dones) * self.config.gamma * target_q
+            
+            current_q = self.critic(grid_inputs, vector_inputs, actions)
+            critic_loss = F.mse_loss(current_q, target_q)
+        
+        # Optimize critic with gradient scaling
+        self.critic_optimizer.zero_grad()
+        self.scaler.scale(critic_loss).backward()
+        self.scaler.step(self.critic_optimizer)
+        
+        # Update Actor
+        with torch.amp.autocast(str(self.device)):
+            actor_actions = self.actor(grid_inputs, vector_inputs)
+            actor_loss = -self.critic(grid_inputs, vector_inputs, actor_actions).mean()
+        
+        # Optimize actor with gradient scaling
+        self.actor_optimizer.zero_grad()
+        self.scaler.scale(actor_loss).backward()
+        self.scaler.step(self.actor_optimizer)
+        
+        self.scaler.update()
+        
+        # Soft update target networks
+        self._soft_update(self.target_actor, self.actor)
+        self._soft_update(self.target_critic, self.critic)
+        
+        return actor_loss.item(), critic_loss.item()
+        
+    def _soft_update(self, target: nn.Module, source: nn.Module):
+        """Efficient soft update implementation"""
+        with torch.no_grad():
+            for target_param, param in zip(target.parameters(), source.parameters()):
+                target_param.data.copy_(
+                    target_param.data * (1.0 - self.config.tau) + 
+                    param.data * self.config.tau
+                )
+                
+    def store_transition(self, state: VehicleState, action: VehicleAction, 
+                        reward: float, next_state: VehicleState, done: bool):
+        """Store transition in optimized buffer"""
+        self.memory.push(state, action, reward, next_state, done)
     
     def select_action(self, state: VehicleState, add_noise: bool = True) -> VehicleAction:
         grid_input, vector_input = state.get_network_inputs()
@@ -87,82 +144,6 @@ class DDPGAgent:
             acceleration = np.clip(acceleration + noise[1], *self.config.action_bounds[1])
         
         return VehicleAction(steering=steering, acceleration=acceleration)
-    
-    def train(self, batch_size: int) -> Tuple[float, float]:
-        """Train the agent on a batch of experiences"""
-        if len(self.memory) < batch_size:
-            return 0.0, 0.0
-        
-        # Sample batch
-        states, actions, rewards, next_states, dones = self.memory.sample(batch_size)
-        
-        # Process states
-        grid_inputs = []
-        vector_inputs = []
-        next_grid_inputs = []
-        next_vector_inputs = []
-        
-        for state in states:
-            grid_input, vector_input = state.get_network_inputs()
-            grid_inputs.append(grid_input)
-            vector_inputs.append(vector_input)
-        
-        for next_state in next_states:
-            next_grid_input, next_vector_input = next_state.get_network_inputs()
-            next_grid_inputs.append(next_grid_input)
-            next_vector_inputs.append(next_vector_input)
-        
-        # Convert to tensors
-        grid_inputs = torch.stack(grid_inputs).to(self.device)
-        vector_inputs = torch.stack(vector_inputs).to(self.device)
-        next_grid_inputs = torch.stack(next_grid_inputs).to(self.device)
-        next_vector_inputs = torch.stack(next_vector_inputs).to(self.device)
-
-        action_arrays = np.array([action.to_numpy() for action in actions])
-        
-        actions = torch.FloatTensor(action_arrays).to(self.device)
-        rewards = torch.FloatTensor(rewards).unsqueeze(1).to(self.device)
-        dones = torch.FloatTensor(dones).unsqueeze(1).to(self.device)
-        
-        # Update Critic
-        with torch.no_grad():
-            next_actions = self.target_actor(next_grid_inputs, next_vector_inputs)
-            target_q = self.target_critic(next_grid_inputs, next_vector_inputs, next_actions)
-            target_q = rewards + (1 - dones) * self.config.gamma * target_q
-        
-        current_q = self.critic(grid_inputs, vector_inputs, actions)
-        critic_loss = F.mse_loss(current_q, target_q)
-        
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
-        
-        # Update Actor
-        actor_actions = self.actor(grid_inputs, vector_inputs)
-        actor_loss = -self.critic(grid_inputs, vector_inputs, actor_actions).mean()
-        
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
-        
-        # Soft update target networks
-        self._soft_update(self.target_actor, self.actor)
-        self._soft_update(self.target_critic, self.critic)
-        
-        return actor_loss.item(), critic_loss.item()
-    
-    def _soft_update(self, target: nn.Module, source: nn.Module):
-        """Soft update target network parameters"""
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(
-                target_param.data * (1.0 - self.config.tau) + 
-                param.data * self.config.tau
-            )
-    
-    def store_transition(self, state: VehicleState, action: VehicleAction, 
-                        reward: float, next_state: VehicleState, done: bool):
-        """Store transition in replay buffer"""
-        self.memory.push(state, action, reward, next_state, done)
     
     def save(self, path: str):
         """Save model weights and training state"""

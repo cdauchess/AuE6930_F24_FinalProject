@@ -35,7 +35,7 @@ def plot_training_metrics(rewards: List[float], losses: List[float], errors: Lis
     plt.savefig('training_metrics.png')
     plt.close()
 
-def train_agent(num_episodes: int = 10):
+def train_agent(num_episodes: int = 10, model_name: str = None):
     # Create environment
     bridge = CoppeliaBridge()
     config = EpisodeConfig()
@@ -52,6 +52,10 @@ def train_agent(num_episodes: int = 10):
     
     agent = DDPGAgent(agent_config)
     
+    if model_name:
+        print(f'Loading Agent =: {model_name}')
+        agent.load(model_name)
+
     # Training metrics
     episode_rewards = []
     episode_losses = []
@@ -103,4 +107,4 @@ def train_agent(num_episodes: int = 10):
     print("Training completed. Model saved as 'agent_trained.pt'")
 
 if __name__ == "__main__":
-    train_agent(num_episodes=400)
+    train_agent(num_episodes=2, model_name="agent_trained.pt")
