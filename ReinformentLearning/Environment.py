@@ -68,8 +68,8 @@ class RLEnvironment:
         # Return initial state
         return VehicleState.from_bridge(self.bridge)
 
-    def step(self, action: VehicleAction) -> Tuple[VehicleState, float, bool, Dict]:
-        """Execute action and return new state, reward, done flag, and info"""
+    def step(self, action: VehicleAction) -> Tuple[VehicleState, Dict, bool, Dict]:
+        """Execute action and return new state, reward dict, done flag, and info"""
         
         # Apply action
         self.bridge.setMotion(action.acceleration)
@@ -83,16 +83,16 @@ class RLEnvironment:
         new_state = VehicleState.from_bridge(self.bridge)
         
         # Calculate reward using reward function
-        reward = self.reward_function.calculate_reward({
+        reward_dict = self.reward_function.calculate_reward({
             'speed': new_state.speed,
-            'path_error': new_state.path_error[0],  # Using lateral error
-            'orientation_error': new_state.path_error[1], # heading_error
+            'path_error': new_state.path_error[0],
+            'orientation_error': new_state.path_error[1],
             'steering': new_state.steering,
             'collision': self.bridge.checkEgoCollide(new_state.occupancy_grid),
             'success': self._success(new_state)
         })
         
-        self.episode_reward += reward
+        self.episode_reward += reward_dict['total']
         self.path_errors.append(new_state.path_error[0])
         self.vehicle_speed.append(new_state.speed)
         self.distance_traveled += new_state.distance
@@ -107,7 +107,7 @@ class RLEnvironment:
             'path_error': new_state.path_error[0]
         }
         
-        return new_state, reward, done, info
+        return new_state, reward_dict, done, info
 
     def _success(self, state: VehicleState) -> bool:
         """Episode succeeds if path completed within error bounds consistently"""

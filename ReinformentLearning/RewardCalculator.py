@@ -14,16 +14,12 @@ class RewardConfig:
     max_path_error: float = 1.0
     max_steering: float = 0.5
     
-    # Component weights
-    speed_weight: float = 1.0
-    path_error_weight: float = 1.0
-    steering_weight: float = 1.0
-    
     # Penalties and bonuses
     collision_penalty: float = -100.0  # Increased penalty
     zero_speed_penalty: float = -10.0
     max_path_error_penalty: float = -10.0
     success_reward: float = 10.0  # Increased reward for completing longer episodes
+
 
 '''
 
@@ -57,7 +53,7 @@ class RLReward:
             return True
         return False
     
-    def calculate_reward(self, state: Dict) -> float:
+    def calculate_reward(self, state: Dict) -> Dict:
         """Calculate reward based on vehicle state"""
         required_keys = {'speed', 'path_error', 'orientation_error', 'steering', 'collision', 'success'}
         if not all(key in state for key in required_keys):
@@ -68,20 +64,20 @@ class RLReward:
         if len(self._error_history) > self._max_history:
             self._error_history.pop(0)
         
-        reward = self.reward_functions[self.active_function](state)
+        reward_dict = self.reward_functions[self.active_function](state)
         
         # Update previous values for next iteration
         self._prev_steering = state['steering']
         self._prev_path_error = state['path_error']
         self._prev_speed = state['speed']
         
-        return reward
+        return reward_dict
     
     def _speed_reward(self, speed: float) -> float:
         """Calculate speed component of reward"""
         if speed <= 0.1:
             return self.config.zero_speed_penalty
-        return self.config.speed_weight * (speed / self.config.max_speed) ** 2
+        return (speed / self.config.max_speed) ** 2
     
     def _path_error_reward(self, error: float) -> float:
         """Calculate path error component of reward using smooth function"""
@@ -90,13 +86,13 @@ class RLReward:
             return self.config.max_path_error_penalty
         
         # Smooth exponential decay
-        reward = (np.exp(-5.0 * normalized_error))
-        return self.config.path_error_weight * reward
+        reward = (np.exp(-2.0 * normalized_error))
+        return reward
     
     def _orientation_reward(self, orientation_error: float) -> float:
         """Calculate orientation reward based on heading error"""
         reward = np.exp(-1.5 * (orientation_error ** 2))
-        return self.config.steering_weight * (2 * reward - 1)
+        return 2 * reward - 1
     
     def _steering_reward(self, steering: float) -> float:
         """Calculate steering reward that encourages smooth, appropriate turning"""
@@ -179,30 +175,39 @@ class RLReward:
             reward += self.config.success_reward
         return reward
     
-    def _smooth_reward(self, state: Dict) -> float:
-        """Enhanced reward function emphasizing smooth control and stable path following"""
-        # Base path following and speed rewards (with adjusted weights)
-        reward = (
-            0.7 * self._path_error_reward(state['path_error']) +  # Reduced weight on path error
-            0.3 * self._speed_reward(state['speed'])              # Reduced weight on speed
-        )
-        
-        # Smoothness and consistency components
-        reward += 1.0 * self._steering_smoothness_reward(state['steering'])        # Strong penalty for jerky steering
-        reward += 1.0 * self._path_tracking_consistency_reward(state['path_error']) # Strong penalty for oscillations
-        reward += 0.5 * self._speed_consistency_reward(state['speed'])             # Moderate penalty for speed changes
-        reward += 0.8 * self._cross_track_damping_reward(                         # Significant weight on damped convergence
+    def _smooth_reward(self, state: Dict) -> Dict:
+        """Enhanced reward function returning components"""
+        # Calculate individual components
+        path_reward = self._path_error_reward(state['path_error'])
+        speed_reward = self._speed_reward(state['speed'])
+        steering_reward = self._steering_smoothness_reward(state['steering'])
+        tracking_reward = self._path_tracking_consistency_reward(state['path_error'])
+        speed_consistency = self._speed_consistency_reward(state['speed'])
+        damping_reward = self._cross_track_damping_reward(
             state['path_error'], 
             state['orientation_error']
         )
         
-        # Critical event penalties
-        if state['collision']:
-            reward += self.config.collision_penalty
-        if state['success']:
-            reward += self.config.success_reward
-            
-        return reward
+        # Critical penalties
+        collision_reward = self.config.collision_penalty if state['collision'] else 0
+        success_reward = self.config.success_reward if state['success'] else 0
+        
+        # Calculate total reward
+        total_reward = (path_reward + speed_reward + steering_reward + 
+                    tracking_reward + speed_consistency + damping_reward + 
+                    collision_reward + success_reward)
+        
+        return {
+            'total': total_reward,
+            'path': path_reward,
+            'speed': speed_reward,
+            'steering': steering_reward,
+            'tracking': tracking_reward,
+            'speed_consistency': speed_consistency,
+            'damping': damping_reward,
+            'collision': collision_reward,
+            'success': success_reward
+        }
     
     def get_available_functions(self) -> List[str]:
         """Get list of available reward functions"""

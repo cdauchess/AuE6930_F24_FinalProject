@@ -40,7 +40,7 @@ def test_agent(model_path: str, num_episodes: int = 2):
         while True:
             action = agent.select_action(state, add_noise=False) 
             next_state, reward, done, info = env.step(action)
-            episode_reward += reward
+            episode_reward += reward['total']
             steps += 1
             
             if steps % 20 == 0:
@@ -65,5 +65,5 @@ def test_agent(model_path: str, num_episodes: int = 2):
         time.sleep(1)
 
 if __name__ == "__main__":
-    #test_agent("TrainedAgents/agent_trained07_300.pt")
+    #test_agent("TrainedAgents/agent_trained08.pt")
     test_agent("agent_trained.pt")
