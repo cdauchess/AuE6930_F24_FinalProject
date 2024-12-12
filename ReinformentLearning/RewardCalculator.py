@@ -44,7 +44,7 @@ class RLReward:
         }
         
         # Default reward function
-        self.active_function = 'smooth'
+        self.active_function = 'standard'
     
     def set_reward_function(self, function_name: str) -> bool:
         """Set the active reward function"""
@@ -164,16 +164,32 @@ class RLReward:
     def _standard_reward(self, state: Dict) -> float:
         """Standard reward function with basic components"""
         reward = 0.0
-        reward += self._speed_reward(state['speed'])
-        reward += self._path_error_reward(state['path_error'])
-        reward += self._orientation_reward(state['orientation_error'])
-        reward += self._steering_reward(state['steering'])
+        speed = self._speed_reward(state['speed'])
+        path = self._path_error_reward(state['path_error'])
+        orientation = self._orientation_reward(state['orientation_error'])
+        steering = self._steering_reward(state['steering'])
+        reward = speed+path+steering+orientation
         
+        collision = 0
+        success = 0
         if state['collision']:
             reward += self.config.collision_penalty
+            collision = self.config.collision_penalty
         if state['success']:
             reward += self.config.success_reward
-        return reward
+            success = self.config.success_reward
+            
+        return {
+            'total': reward,
+            'path': path,
+            'speed': speed,
+            'steering': steering,
+            'tracking': 0,
+            'speed_consistency': 0,
+            'damping': 0,
+            'collision': collision,
+            'success': success
+        }
     
     def _smooth_reward(self, state: Dict) -> Dict:
         """Enhanced reward function returning components"""
