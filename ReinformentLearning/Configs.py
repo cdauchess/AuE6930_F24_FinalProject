@@ -3,7 +3,7 @@ from dataclasses import dataclass
 @dataclass
 class EpisodeConfig:
     """Configuration for RL episodes"""
-    max_steps: int = 800  # Increased from 200
+    max_steps: int = 500  # Increased from 200
     position_range: float = 1.0
     orientation_range: float = 0.1
     max_path_error: float = 1.0
@@ -30,11 +30,6 @@ class RewardConfig:
     max_path_error: float = 1.0
     max_steering: float = 0.5
     
-    # Component weights
-    speed_weight: float = 1.0
-    path_error_weight: float = 1.0
-    steering_weight: float = 0.25
-    
     # Penalties and bonuses
     collision_penalty: float = -100.0  # Increased penalty
     zero_speed_penalty: float = -10.0
@@ -46,7 +41,7 @@ class DDPGConfig:
     """Configuration for DDPG Agent"""
     state_dim: int = 5
     action_dim: int = 2  # [steering, speed]
-    hidden_dim: int = 256
+    hidden_dim: int = 512
     actor_lr: float = 0.001
     critic_lr: float = 0.001
     gamma: float = 0.99

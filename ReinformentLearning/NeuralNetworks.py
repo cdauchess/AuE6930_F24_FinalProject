@@ -5,7 +5,7 @@ import numpy as np
 
 class ActorNetwork(nn.Module):
     def __init__(self, vector_dim: int, grid_size: int, action_dim: int, hidden_dim: int = 128, 
-                 action_bounds: tuple = ((-0.5, 0.5), (0, 10))):
+                 action_bounds: tuple = ((-0.5, 0.5), (-1, 1))):
         super(ActorNetwork, self).__init__()
         self.action_bounds = action_bounds
         
