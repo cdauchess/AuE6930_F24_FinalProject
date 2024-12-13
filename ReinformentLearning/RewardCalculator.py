@@ -44,7 +44,7 @@ class RLReward:
         }
         
         # Default reward function
-        self.active_function = 'standard'
+        self.active_function = 'smooth'
     
     def set_reward_function(self, function_name: str) -> bool:
         """Set the active reward function"""

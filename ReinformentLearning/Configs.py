@@ -41,9 +41,9 @@ class DDPGConfig:
     """Configuration for DDPG Agent"""
     state_dim: int = 5
     action_dim: int = 2  # [steering, speed]
-    hidden_dim: int = 256
-    actor_lr: float = 0.003
-    critic_lr: float = 0.003
+    hidden_dim: int = 512
+    actor_lr: float = 0.001
+    critic_lr: float = 0.001
     gamma: float = 0.99
     tau: float = 0.001  # For soft target updates
     noise_std: float = 0.1
