@@ -6,18 +6,28 @@ This repository contains the implementation of a Deep Deterministic Policy Gradi
 ## Features
 
 - **Custom CoppeliaSim Bridge**: A robust interface between the RL environment and CoppeliaSim simulator. Paths are placed at the top level and named sequentially (path1, path2, path3, etc.) This allows simple loading of all path information in the python bridge.
+
 ![Path Location](./Images/PathInformation.png)
+
 - **Multi-Channel Occupancy Grid**: Novel 4-channel representation combining:
   - Binary obstacle information
   - Distance fields
   - Path information
   - Path deviation metrics
+
 ![Path Location](./Images/Occupancy_Grid.png)
-- **Dual-Stream Neural Network**: Architecture processing both spatial and dynamic vehicle state information
-![Path Location](./Images/Actor-Critic.png)
-- **Multiple Reward Functions**: Implements simple, standard, and smooth reward schemes
+
 - **DDPG Implementation**: Complete with actor-critic networks, replay buffer, and various training optimizations
+
 ![Path Location](./Images/DDPG.png)
+
+- **Dual-Stream Neural Network**: Architecture processing both spatial and dynamic vehicle state information
+
+![Path Location](./Images/Actor-Critic.png)
+
+- **Multiple Reward Functions**: Implements simple, standard, and smooth reward schemes
+
+
 
 ## Project Structure
 
