@@ -1,4 +1,8 @@
 # AuE6930_F24_FinalProject
+## Demo Video
+
+Watch our agent in action: [YouTube Demo](https://youtu.be/ib-J4YWBM8U)
+
 # Deep Deterministic Policy Gradient AI Agent for Vehicle Control
 
 This repository contains the implementation of a Deep Deterministic Policy Gradient (DDPG) based AI agent for autonomous vehicle control using multi-channel occupancy grid representations. The system integrates a CoppeliaSim-based simulation environment with a custom reinforcement learning framework to train agents for path following and obstacle avoidance tasks.
